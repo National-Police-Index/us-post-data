@@ -8,8 +8,8 @@ import requests
 # Dictionary of states with their respective Dropbox links
 state_links = {
     # "alaska": "https://www.dropbox.com/scl/fi/46hmzd088xsfodjvrn1nd/alaska_index.csv?rlkey=sxm9twoj6e5yunourtxbtxtdf&st=9yrbcvvm&dl=1",
-    "arizona": "https://www.dropbox.com/scl/fi/7l9iaj2qbzq2i0azey2fl/arizona_index.csv?rlkey=2kvtnw5iaonixm08i922c5yw0&st=01o4r4j0&dl=1",
     "california": "https://www.dropbox.com/scl/fi/ojr27wvg0f9qzobvpbfmt/ca-index.csv?rlkey=4ahuwe2tlsl1s9ri854q0p2d4&st=00x85e8s&dl=1",
+    "arizona": "https://www.dropbox.com/scl/fi/fzeinccv04sb0jocmky8y/arizona_index.csv?rlkey=porsia5lpzhg61rlb7u4kqe1d&st=fjfodsfq&dl=1",
     "florida": "https://www.dropbox.com/scl/fi/xbvuqf3sx6spr0369j5po/florida_index.csv?rlkey=qhbulvsqggtqqs1t52n5d3hbb&st=1lu4dgzm&dl=1",
     "florida-discipline": "https://www.dropbox.com/scl/fi/2iwmesdziw23ngm9bftu8/florida-discipline_index.csv?rlkey=0s0935k8dbrrnlckx2bzfnzcb&st=w0boolgj&dl=1",
     "georgia": "https://www.dropbox.com/scl/fi/zt5bjmti0ib53zret4cjl/georgia_index.csv?rlkey=vxdihmruxipj0t70qkg6gv3f3&st=vteh8461&dl=1",

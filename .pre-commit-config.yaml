@@ -1,6 +1,6 @@
 repos:
   - repo: https://github.com/nbQA-dev/nbQA
-    rev: 1.8.5
+    rev: 1.9.1
     hooks:
       - id: nbqa-ruff
         args:
@@ -17,7 +17,7 @@ repos:
           - --profile=black
 
   - repo: https://github.com/pre-commit/pre-commit-hooks
-    rev: v4.4.0
+    rev: v5.0.0
     hooks:
       - id: trailing-whitespace
       - id: check-executables-have-shebangs
@@ -47,7 +47,7 @@ repos:
       - id: python-no-log-warn
 
   - repo: https://github.com/PyCQA/isort
-    rev: 5.12.0
+    rev: 6.0.1
     hooks:
       - id: isort
         name: Run isort to sort imports
@@ -60,7 +60,7 @@ repos:
           - --line-length=80
 
   - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: v0.4.10
+    rev: v0.11.9
     hooks:
       - id: ruff
         types_or: [python,pyi]
