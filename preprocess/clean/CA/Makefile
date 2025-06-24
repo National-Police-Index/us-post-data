@@ -23,10 +23,7 @@ output/poca_df.csv: src/scraper.py
 	cd src && python scraper.py
 
 .PHONY: all
-output/ca-index.csv: \
-	src/concat-cleaned.py \
-	output/ca-leo-processed.csv \
-	output/ca-corrections-processed.csv
+output/ca-index.csv: src/concat-cleaned.py output/ca-leo-processed.csv output/ca-corrections-processed.csv
 	mkdir -p output
 	python $< output/ca-leo-processed.csv output/ca-corrections-processed.csv $@
 
