@@ -97,3 +97,8 @@ cor.test(for_review$post_count, for_review$lear_count)
 lm(lear_count ~ post_count, data = for_review) %>% summary
 
 write_xlsx(for_review, "output/il-lear-matches.xlsx", col_names = TRUE)
+
+for_review %>%
+    filter(is.na(lear_id)) %>%
+    distinct(npi) %>%
+    write_xlsx("output/il-unmatched.xlsx", col_names = TRUE)
