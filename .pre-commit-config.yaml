@@ -3,7 +3,16 @@ repos:
     rev: v0.4.0
     hooks:
       - id: style-files
+        args: [--style_pkg=styler, --style_fun=tidyverse_style]
       - id: lintr
+        args:
+          - --linters_with_defaults
+          - object_name_linter
+          - "line_length_linter(120)"
+      - id: readme-rmd-rendered
+      - id: parsable-R
+      - id: no-browser-statement
+      - id: no-debug-statement
 
   - repo: https://github.com/nbQA-dev/nbQA
     rev: 1.9.1
