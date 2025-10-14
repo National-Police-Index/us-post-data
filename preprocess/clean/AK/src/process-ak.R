@@ -106,12 +106,15 @@ out <- bind_rows(ak17_out, new_hires) %>%
                   select(person_nbr, start_date, ch_agency = agency_name, employment_status),
               by = c("person_nbr", "start_date")) %>%
     verify(is.na(employment_status) | employment_status %in% c("Resigned", "Terminated")) %>%
+    mutate(end_date_inexact = case_when(
+            is.na(end_date) & !is.na(employment_status) ~ 1,
+            TRUE ~ NA_integer_)) %>%
     mutate(end_date = case_when(
         !is.na(end_date) ~ end_date,
         !is.na(employment_status) ~ '2023-01-31', # date of the records disclosure
         TRUE ~ end_date)) %>%
     select(person_nbr, first_name, middle_initial, last_name,
-           agency_name, start_date, end_date)
+           agency_name, start_date, end_date, end_date_inexact)
 
 write_csv(out, "output/ak-processed.csv", na = "")
 
