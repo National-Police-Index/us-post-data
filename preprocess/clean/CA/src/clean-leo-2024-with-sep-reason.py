@@ -1,6 +1,5 @@
 import argparse
 
-import nameparser
 import pandas as pd
 
 
@@ -22,7 +21,7 @@ term_code_dictionary = {
 
 def getargs():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--input", default = "input/leo-2024-with-sep-reason.xlsx")
+    parser.add_argument("--input")
     parser.add_argument("--output")
     return parser.parse_args()
 
@@ -43,7 +42,9 @@ def clean_names(df):
     first_middle_sfx = cleanstring(split_names[1].fillna(""))
     out["first_name"] = first_middle_sfx.str.extract(r"^([^\s]+)")
     middle_sfx = first_middle_sfx.str.extract(r"^[^\s]+\s+(.*)$")[0]
-    out["middle_name"] = middle_sfx.str.replace(r"\s+(JR|SR|II|III|IV|JUNIOR|JR\.)$", "", regex=True).str.strip()
+    out["middle_name"] = middle_sfx.str.replace(
+        r"\s+(JR|SR|II|III|IV|JUNIOR|JR\.)$", "", regex=True
+    ).str.strip()
     return out
 
 
