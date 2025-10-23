@@ -1,6 +1,5 @@
 import argparse
 
-import nameparser
 import pandas as pd
 
 
@@ -27,12 +26,25 @@ def getargs():
     return parser.parse_args()
 
 
+def cleanstring(strings):
+    return (
+        strings.fillna("")
+        .str.replace(r"\s+", " ", regex=True)
+        .str.strip()
+        .str.upper()
+    )
+
+
 def clean_names(df):
     out = df
-    hn = out.officer_name.apply(nameparser.HumanName)
-    out["last_name"] = hn.apply(lambda x: x.last)
-    out["first_name"] = hn.apply(lambda x: x.first)
-    out["middle_name"] = hn.apply(lambda x: x.middle)
+    split_names = out.officer_name.str.split(",", expand=True)
+    out["last_name"] = cleanstring(split_names[0])
+    first_middle_sfx = cleanstring(split_names[1].fillna(""))
+    out["first_name"] = first_middle_sfx.str.extract(r"^([^\s]+)")
+    middle_sfx = first_middle_sfx.str.extract(r"^[^\s]+\s+(.*)$")[0]
+    out["middle_name"] = middle_sfx.str.replace(
+        r"\s+(JR|SR|II|III|IV|JUNIOR|JR\.)$", "", regex=True
+    ).str.strip()
     return out
 
 
