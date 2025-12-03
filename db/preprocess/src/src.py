@@ -7,6 +7,8 @@ import numpy as np
 import pandas as pd
 
 
+# dates aren't normalized?? 
+
 def case_cols(df):
     columns_to_transform = [
         "person_nbr",
