@@ -33,7 +33,7 @@ state_links = {
 }
 
 # Directory to save the CSV files
-output_dir = "data"
+output_dir = "../data/output"
 
 # Create the directory if it doesn't exist
 os.makedirs(output_dir, exist_ok=True)

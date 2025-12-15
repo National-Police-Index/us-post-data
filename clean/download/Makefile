@@ -3,4 +3,4 @@ all: download
 
 .PHONY: download
 download:
-	python3 src.py
+	python3 src/src.py
