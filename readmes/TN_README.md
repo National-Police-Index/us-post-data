@@ -19,11 +19,11 @@ The script utilizes two main data sources:
 
 The script performs the following data cleaning steps:
 
-1. **Reading and Renaming Columns**: The script reads the CSV file to get the column names and reads the first 126 columns from the Excel file. These columns are those associated with employment history data. 
+1. **Reading and Renaming Columns**: The script reads the CSV file to get the column names and reads the first 126 columns from the Excel file. These columns are those associated with employment history data.
 
 2. **Filtering Rows**: The script filters out rows where the "Person PSID"/UID column is empty.
 
-3. **Splitting Rows by Employment Stints**: The script splits a single row into individual employment stints based on the employment columns (up to 11 stints/rows per office). 
+3. **Splitting Rows by Employment Stints**: The script splits a single row into individual employment stints based on the employment columns (up to 11 stints/rows per office).
 
 4. **Cleaning UIDs**: The "person_nbr" column is cleaned by removing any leading "**".
 
@@ -47,7 +47,7 @@ The script generates three CSV files:
 3. `tn-2024-index.csv`: Contains a standardized index for both law enforcement and corrections officers. Each officer can be associated with a single department multiple times within one employment stint. Common reasons for multiple associations with a single department include changes in rank.
 
 ## Additional information
-The input directory contains `tn-2024-reciprocity.csv`. This table contains information on officers who joined the Georgia POST agency after being affiliated with a POST agency in a different state. 
+The input directory contains `tn-2024-reciprocity.csv`. This table contains information on officers who joined the Georgia POST agency after being affiliated with a POST agency in a different state.
 
 ## Questions or suggestions for improvement?
 

@@ -1,6 +1,6 @@
 # Ohio Officer History Data Processing
 
-These data were obtained under the state open records law from the [Ogio Peace Officer Training Commission](https://www.ohioattorneygeneral.gov/Law-Enforcement/Ohio-Peace-Officer-Training-Academy/Ohio-Peace-Officer-Training-Commission). 
+These data were obtained under the state open records law from the [Ogio Peace Officer Training Commission](https://www.ohioattorneygeneral.gov/Law-Enforcement/Ohio-Peace-Officer-Training-Academy/Ohio-Peace-Officer-Training-Commission).
 
 The data released includes personnel and employment history for all officers certified in the state going back to the 1950s. Our processing performs several operations to clean, standardize, and reformat the data into a work history index file that is consistent with other states' data obtained as part of this tracking project. The original data is preserved in CSV format for reference.
 
@@ -24,7 +24,7 @@ The data cleaning process involves several steps:
 
 - Importing the Excel files and cleaning up the column names for consistency with the index files created for other states in the project.
 - Including splitting the full name into first name, middle name, last name, and suffix. Cleaning up the suffixes. Reassembling the full name in the order for standardization across all states' index files.
-- In a few cases, dates that 
+- In a few cases, dates that
 
 ## Output
 
@@ -40,4 +40,3 @@ The output files are stored in the `data/processed/` directory.
 ## Questions or suggestions for improvement?
 
 Processing by John Kelly, CBS News at `JohnL.Kelly@cbsnews.com`.
-

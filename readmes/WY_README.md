@@ -1,6 +1,6 @@
 # Wyoming Officer Data Processing
 
-These data were obtained under the state open records law from the [Wyoming Peace Officer Standards and Training Board](https://post.wyo.gov). 
+These data were obtained under the state open records law from the [Wyoming Peace Officer Standards and Training Board](https://post.wyo.gov).
 
 The data released includes personnel information, license and certification information, and employment history for all officers certified in the state going back to the 1960s. Our processing performs several operations to clean, standardize, and reformat the data into a work history index file that is consistent with other states' data obtained as part of this tracking project. The original data is preserved in CSV format for reference.
 

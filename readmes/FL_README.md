@@ -1,6 +1,6 @@
 # Florida Officer Data Processing
 
-These data were obtained under the state open records law from the [Florida Department of Law Enforcement](https://www.fdle.state.fl.us/OGC/Public-Records.aspx). 
+These data were obtained under the state open records law from the [Florida Department of Law Enforcement](https://www.fdle.state.fl.us/OGC/Public-Records.aspx).
 
 The data released includes personnel information, certification information, employment history, complaints and disciplinary actions for all officers certified in the state going back to the 1940s. Our processing performs several operations to clean, standardize, and reformat the data into a work history index file that is consistent with other states' data obtained as part of this tracking project. The original data is preserved in CSV format for reference.
 

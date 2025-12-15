@@ -1,6 +1,6 @@
 # Arizona Officer History Data Processing
 
-These data were obtained under the state open records law from the [Arizona Peace Officer Standards and Training Board](https://post.az.gov). 
+These data were obtained under the state open records law from the [Arizona Peace Officer Standards and Training Board](https://post.az.gov).
 
 The data released includes personnel and employment history for all officers certified in the state going back to the 1950s. Our processing performs several operations to clean, standardize, and reformat the data into a work history index file that is consistent with other states' data obtained as part of this tracking project. The original data is preserved in CSV format for reference.
 
@@ -21,7 +21,7 @@ The APOST provided one Excel data file in response to a state public records req
 
 The data cleaning process involves several steps:
 
-- Importing the Excel file and cleaning up the column names for consistency with the index files created for other states in the project. 
+- Importing the Excel file and cleaning up the column names for consistency with the index files created for other states in the project.
 - Including splitting the full name into first name, middle name, last name, and suffix. Cleaning up the suffixes. Reassembling the full name.
 - In a few cases, manual corrections were made to the names suffixes after additional reporting and research to confirm the names were correct.
 
@@ -38,4 +38,3 @@ The output files are stored in the `data/processed/` directory.
 ## Questions or suggestions for improvement?
 
 Processing by John Kelly, CBS News at JohnL.Kelly@cbsnews.com.
-

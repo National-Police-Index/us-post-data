@@ -1,6 +1,6 @@
 # North Carolina Law Enforcement Work History and License History
 
-These data were obtained under the state open records law from the [xxxx](https://xxxxxxx.gov/xxxxx). 
+These data were obtained under the state open records law from the [xxxx](https://xxxxxxx.gov/xxxxx).
 
 The data released includes certification information and employment history for all officers certified in the state going back to the 1930s. Our processing performs several operations to clean, standardize, and reformat the data into a work history index file that is consistent with other states' data obtained as part of this tracking project. The original data is preserved in CSV format for reference.
 

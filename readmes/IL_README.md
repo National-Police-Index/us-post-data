@@ -1,6 +1,6 @@
 # Illinois Officer Data Processing
 
-These data were obtained under the state open records law from the [Illinois Law Enforcement Training and Standards Board](https://www.ptb.illinois.gov). 
+These data were obtained under the state open records law from the [Illinois Law Enforcement Training and Standards Board](https://www.ptb.illinois.gov).
 
 The data released includes personnel information, license and certification information, and employment history for all officers certified in the state going back to the 1960s. Our processing performs several operations to clean, standardize, and reformat the data into a work history index file that is consistent with other states' data obtained as part of this tracking project. The original data is preserved in CSV format for reference.
 
@@ -27,7 +27,7 @@ The Training and Standards Board provided five data files in response to a state
 - Relevant date columns are converted to the YYYY-MM-DD format to be consistent with other date fields throughout the project files from other states.
 - The employment, agencies, person_data, and codes dataframes are combined on a unique ID (identified by the state of Illinois) to create a more complete work history index similar to those compiled for other states in the project.
 - All the name columns are changed to title case and a full name field is created.
-- Decertification offense date and decertification reason are added to the index file as a flag indicating that researchers can reference more detailed information about decertification in the decertification file. 
+- Decertification offense date and decertification reason are added to the index file as a flag indicating that researchers can reference more detailed information about decertification in the decertification file.
 - Processed index plus a series of CSV files with the original data obtained from Illinois are also exported.
 
 ## Output

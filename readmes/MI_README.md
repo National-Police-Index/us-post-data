@@ -1,5 +1,5 @@
 # Michigan Revocation database README
-This README provides an overview of the data cleaning process for the [Michigan Commission on Law Enforcement Standards](https://www.michigan.gov/mcoles/), or "MCOLES", [Revocation](https://regulations.justia.com/states/michigan/state-police/michigan-commission-on-law-enforcement-standards-mcoles/law-enforcement-standards-and-training/part-6/section-r-28-14604/) data from 2000 - 2018 (exclusive). The code 
+This README provides an overview of the data cleaning process for the [Michigan Commission on Law Enforcement Standards](https://www.michigan.gov/mcoles/), or "MCOLES", [Revocation](https://regulations.justia.com/states/michigan/state-police/michigan-commission-on-law-enforcement-standards-mcoles/law-enforcement-standards-and-training/part-6/section-r-28-14604/) data from 2000 - 2018 (exclusive). The code
 
 The names of Michigan Law Enforcement personnel who have had their license revoked by MCOLES between 2018 to present are listed on their [webpage](https://www.michigan.gov/mcoles/commission-info/revocations). Conviction information is not available in the linked summary documents.
 

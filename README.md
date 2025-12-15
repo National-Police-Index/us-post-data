@@ -1,6 +1,6 @@
 # US National Police Index - Backend Data Repository
 
-This repository contains the backend data processing infrastructure for the National Police Index. 
+This repository contains the backend data processing infrastructure for the National Police Index.
 
 ## Repository Structure
 

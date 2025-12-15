@@ -19,7 +19,7 @@ The script utilizes the following main data sources:
 The script performs the following data cleaning steps:
 
 1. **Reading and Renaming Columns**: The script reads the CSV file and renames specific columns to standardize the dataset.
-   
+
 2. **Transforming Columns**: The script identifies columns that remain constant across employments and those that vary for each employment stint. It then melts and pivots the DataFrame to arrange the data accordingly.
 
 3. **Arranging New DataFrame**: The script renames columns for clarity and drops unnecessary columns.
@@ -51,7 +51,7 @@ The script generates three CSV files:
 3. `wv-2024-index.csv`: Contains a standardized index for both law enforcement and corrections officers. Each officer can be associated with a single department multiple times within one employment stint. Common reasons for multiple associations with a single department include changes in rank.
 
 ## Additional information
-The input directory contains `wv-2024-reciprocity.csv`. This table contains information on officers who joined the Georgia POST agency after being affiliated with a POST agency in a different state. 
+The input directory contains `wv-2024-reciprocity.csv`. This table contains information on officers who joined the Georgia POST agency after being affiliated with a POST agency in a different state.
 
 ## Questions or Suggestions for Improvement?
 

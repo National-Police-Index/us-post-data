@@ -58,7 +58,7 @@ It's important to note that while both datasets were nearly analogous, there was
 4. Standardizes name columns be removing extra white space and periods.
 5. Creates a 'full_name' field by concatenating 'first_name', 'middle_name', and 'last_name'.
 
-## Output 
+## Output
 
 The script generates four CSV files:
 
@@ -71,7 +71,7 @@ The script generates four CSV files:
 4. `ga-2024-enhanced-work-history.csv`: Contains all the columns from the index file, with the addition of status and change_reason. This allows you to see the reasons an officer separated from an agency, including retirement, resignation, termination, etc.
 
 ## Additional information
-The input directory contains `ga-2024-reciprocity.csv`. This table contains information on officers who joined the Georgia POST agency after being affiliated with a POST agency in a different state. 
+The input directory contains `ga-2024-reciprocity.csv`. This table contains information on officers who joined the Georgia POST agency after being affiliated with a POST agency in a different state.
 
 ## Questions or suggestions for improvement?
 

@@ -1,6 +1,6 @@
 # Alaska Officer Data Processing
 
-These data were obtained under the state open records law from the [Alaska Department of Public Safety's Police Standards Council](https://dps.alaska.gov/APSC/Home). 
+These data were obtained under the state open records law from the [Alaska Department of Public Safety's Police Standards Council](https://dps.alaska.gov/APSC/Home).
 
 The data released includes personnel information, license and certification information, and employment history for all officers certified in the state. The employment change data only tracks the changes since 2017. Our processing performs several operations to clean, standardize, and reformat the data into a work history index file that is consistent with other states' data obtained as part of this tracking project. The original data is preserved in CSV format for reference.
 

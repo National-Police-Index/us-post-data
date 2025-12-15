@@ -1,6 +1,6 @@
 # Maryland Officer Data Processing
 
-These data were obtained under the state open records law from the [Maryland Police Training and Standards Commission](https://mdle.net/standards.htm). 
+These data were obtained under the state open records law from the [Maryland Police Training and Standards Commission](https://mdle.net/standards.htm).
 
 The data released includes personnel information and employment history for all officers certified in the state going back to the 1960s. Our processing performs several operations to clean, standardize, and reformat the data into a work history index file that is consistent with other states' data obtained as part of this tracking project. The original data is preserved in CSV format for reference. Where information was not provided, columns are left blank in the standardized index.
 
