@@ -1,5 +1,5 @@
-import pandas as pd
 import numpy as np
+import pandas as pd
 
 
 def read_tbl():
@@ -124,13 +124,17 @@ def create_officers_table(df):
             deleted_at, deleted_by
     """
     # Get unique officers by person_nbr
-    officers = df[["person_nbr", "first_name", "middle_name", "last_name"]].copy()
+    officers = df[
+        ["person_nbr", "first_name", "middle_name", "last_name"]
+    ].copy()
 
     # Remove empty strings and convert to None for proper handling
     officers = officers.replace("", np.nan)
 
     # Deduplicate based on person_nbr
-    officers = officers.drop_duplicates(subset=["person_nbr"]).reset_index(drop=True)
+    officers = officers.drop_duplicates(subset=["person_nbr"]).reset_index(
+        drop=True
+    )
 
     # Use person_nbr as the officer ID
     officers = officers.rename(columns={"person_nbr": "id"})
@@ -165,11 +169,9 @@ def create_agencies_table(ori_df, appointments_df):
     agencies = ori_df.copy()
 
     # Get cleaned agency names from appointments
-    agency_names = (
-        appointments_df[appointments_df["agency_ori"] != ""][
-            ["agency_ori", "agency_name"]
-        ].drop_duplicates(subset=["agency_ori"])
-    )
+    agency_names = appointments_df[appointments_df["agency_ori"] != ""][
+        ["agency_ori", "agency_name"]
+    ].drop_duplicates(subset=["agency_ori"])
 
     # Merge cleaned names with ORI data
     agencies = agencies.merge(
@@ -187,7 +189,9 @@ def create_agencies_table(ori_df, appointments_df):
     # Find agencies in appointments that are NOT in ORI data (excluding empty ORIs)
     ori_oris = set(agencies["ori_9"].unique())
     appointments_oris = set(
-        appointments_df[appointments_df["agency_ori"] != ""]["agency_ori"].unique()
+        appointments_df[appointments_df["agency_ori"] != ""][
+            "agency_ori"
+        ].unique()
     )
     missing_oris = appointments_oris - ori_oris
 
@@ -207,7 +211,7 @@ def create_agencies_table(ori_df, appointments_df):
         missing_df["addr_street_one"] = None
         missing_df["addr_street_two"] = None
         missing_df["city"] = None
-        missing_df["state"] = "AZ"  
+        missing_df["state"] = "AZ"
         missing_df["zipcode"] = None
         missing_df["population_served"] = None
         missing_df["latitude"] = None
@@ -277,7 +281,7 @@ def create_appointments_table(appointments_df, agencies_df):
     """
     appointments = appointments_df.copy()
 
-    # First, match agencies by ORI code 
+    # First, match agencies by ORI code
     agencies_with_ori = agencies_df[agencies_df["ori_9"].notna()][
         ["id", "ori_9", "name"]
     ].copy()
@@ -312,7 +316,9 @@ def create_appointments_table(appointments_df, agencies_df):
 
         # Drop temporary columns
         if "agency_id_by_name" in appointments.columns:
-            appointments = appointments.drop(columns=["agency_id_by_name", "name"])
+            appointments = appointments.drop(
+                columns=["agency_id_by_name", "name"]
+            )
 
     # officer_id is the same as person_nbr (since we use person_nbr as officer.id)
     appointments["officer_id"] = appointments["person_nbr"]
@@ -320,7 +326,13 @@ def create_appointments_table(appointments_df, agencies_df):
     # Deduplicate appointments based on unique combination
     # Keep first occurrence of each unique appointment
     appointments = appointments.drop_duplicates(
-        subset=["person_nbr", "agency_ori", "agency_name", "start_date", "end_date"]
+        subset=[
+            "person_nbr",
+            "agency_ori",
+            "agency_name",
+            "start_date",
+            "end_date",
+        ]
     ).reset_index(drop=True)
 
     # Select and order columns for appointments table
@@ -359,7 +371,7 @@ def create_appointments_table(appointments_df, agencies_df):
 
 if __name__ == "__main__":
     print("Reading and processing data...")
-       
+
     # pre-process az data
     az_raw = read_tbl()
     appointments_raw = az_raw.pipe(clean_sep_reason).pipe(clean_agency_name)
@@ -383,7 +395,7 @@ if __name__ == "__main__":
     print("=" * 80)
     print(f"Shape: {officers.shape}")
     print(f"\nColumns: {list(officers.columns)}")
-    print(f"\nFirst 5 rows:")
+    print("\nFirst 5 rows:")
     print(officers.head())
 
     print("\n" + "=" * 80)
@@ -391,7 +403,7 @@ if __name__ == "__main__":
     print("=" * 80)
     print(f"Shape: {agencies.shape}")
     print(f"\nColumns: {list(agencies.columns)}")
-    print(f"\nFirst 5 rows:")
+    print("\nFirst 5 rows:")
     print(agencies.head())
 
     print("\n" + "=" * 80)
@@ -399,7 +411,7 @@ if __name__ == "__main__":
     print("=" * 80)
     print(f"Shape: {appointments.shape}")
     print(f"\nColumns: {list(appointments.columns)}")
-    print(f"\nFirst 5 rows:")
+    print("\nFirst 5 rows:")
     print(appointments.head())
 
     # Save to CSV files
@@ -416,4 +428,3 @@ if __name__ == "__main__":
     print(f"✓ agencies.csv saved ({len(agencies)} records)")
     print(f"✓ appointments.csv saved ({len(appointments)} records)")
     print("\nDone!")
-
