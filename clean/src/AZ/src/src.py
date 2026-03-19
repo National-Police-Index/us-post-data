@@ -18,7 +18,7 @@ def read_tbl():
             "Term_Desc": "separation_reason",
             "PostId": "person_nbr",
             "Rank": "rank",
-            "CertStatus_Current": "status", 
+            "CertStatus_Current": "status",
         }
     )
 
