@@ -18,6 +18,7 @@ def read_tbl():
             "Term_Desc": "separation_reason",
             "PostId": "person_nbr",
             "Rank": "rank",
+            "CertStatus_Current": "status", 
         }
     )
 
@@ -26,7 +27,6 @@ def read_tbl():
     df = df.drop(
         columns=[
             "CertStatus_atTerm",
-            "CertStatus_Current",
             "FinalActions",
         ]
     )
@@ -345,6 +345,7 @@ def create_appointments_table(appointments_df, agencies_df):
             "start_date",
             "end_date",
             "separation_reason",
+            "status",
         ]
     ]
 
