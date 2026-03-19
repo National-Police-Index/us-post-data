@@ -1,18 +1,128 @@
 # schema.yml
-## these is a schema for the columns that are (relatively) consistent across states
+# Schema for the standardized officer index CSV produced by each state's clean.py
+# and consumed by db/preprocess and db/upload.
+#
+# Required columns must be present and non-empty; optional columns may be omitted
+# if the state data does not include them.
+#
+# After preprocessing, two additional columns are added automatically:
+#   - state:       lowercase hyphenated state name (e.g. "new-york")
+#   - document_id: "<state>_<person_nbr>" (used as Firestore document key)
 
 schema:
-  unique_citizen:
-    columns:
-      - name: uid
-        description: >
-          unique officer id
-      - name: agency_name
-        description: >
-          name of the agency
-      - name: employment_type
-        description: >
-          full-time, part-time, reserve, etc
-      - name: agency_type
-        description: >
-          police, corrections, etc
+  required_columns:
+    - name: person_nbr
+      type: string
+      description: >
+        Unique officer identifier assigned by the state POST agency.
+        Lowercased and stripped during preprocessing.
+
+    - name: first_name
+      type: string
+      description: >
+        Officer's first name. Lowercased during preprocessing, then
+        proper-cased (e.g. "JOHN" → "John").
+
+    - name: last_name
+      type: string
+      description: >
+        Officer's last name. Records where last_name contains "withheld"
+        (case-insensitive) are filtered out during preprocessing.
+
+    - name: agency_name
+      type: string
+      description: >
+        Name of the employing agency. Common abbreviations are expanded
+        during preprocessing: "SO" → "Sheriff's Office",
+        "PD" → "Police Department".
+
+    - name: start_date
+      type: string
+      format: YYYY-MM-DD
+      description: >
+        Employment start date. Records with a missing or empty start_date
+        are dropped during preprocessing.
+
+    - name: end_date
+      type: string
+      format: YYYY-MM-DD
+      description: >
+        Employment end date. Empty/null means currently employed.
+
+  optional_columns:
+    - name: full_name
+      type: string
+      description: >
+        Concatenated full name (e.g. "first_name last_name"). Not always
+        present; some states produce it in clean.py, others do not.
+
+    - name: middle_name
+      type: string
+      description: >
+        Officer's middle name or initial. Lowercased and proper-cased
+        during preprocessing if present.
+
+    - name: suffix
+      type: string
+      description: >
+        Name suffix (e.g. "Jr", "Sr", "II"). Roman numerals are uppercased;
+        Jr/Sr are capitalized during preprocessing.
+
+    - name: rank
+      type: string
+      description: >
+        Officer's rank or title at the agency (e.g. "Police Officer",
+        "Lieutenant", "Deputy").
+
+    - name: separation_reason
+      type: string
+      description: >
+        Reason for end of employment. Examples: "Resigned", "Discharged",
+        "Retired", "Decertified", "Did Not Complete Probation".
+        Lowercased and proper-cased during preprocessing.
+
+    - name: employment_status
+      type: string
+      description: >
+        Current or historical employment status (e.g. "active", "inactive").
+        Lowercased and proper-cased during preprocessing.
+
+    - name: employment_change
+      type: string
+      description: >
+        Description of an employment change event, if provided by the state.
+        Lowercased and proper-cased during preprocessing.
+
+    - name: offense
+      type: string
+      description: >
+        Decertification reason or misconduct offense, if reported by the state.
+
+    - name: race
+      type: string
+      description: >
+        Officer's reported race or race/ethnicity category.
+        Lowercased and proper-cased during preprocessing.
+
+    - name: sex
+      type: string
+      description: >
+        Officer's reported sex or gender. Lowercased during preprocessing.
+
+    - name: year_of_birth
+      type: string
+      description: >
+        Officer's year of birth (four-digit string). Some states provide
+        full DOB which is converted to birth_year in clean.py.
+
+  preprocessing_notes:
+    - Columns listed in required_columns are validated by check_required_columns()
+      in db/preprocess/src/src.py; missing columns raise a ValueError.
+    - check_empty_values() warns (but does not fail) when any required column
+      contains nulls or empty strings.
+    - collapse_contiguous_stints() is applied only to California data, merging
+      overlapping or adjacent employment records for the same officer/agency.
+    - All string columns are lowercased first (case_cols), then proper-cased
+      (apply_proper_casing) to ensure consistent formatting across states.
+    - Date strings are stripped of trailing decimal artifacts (e.g. "2020-01-01.0"
+      → "2020-01-01") and validated to fall between 1800 and 2100.
