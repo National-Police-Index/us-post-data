@@ -9,17 +9,17 @@ This document is the authoritative guide for Claude agents and humans cleaning r
 ```
 Dropbox (raw state data)
     ↓
-automated_processing/data/input/<STATE>/data/input/   ← raw files land here
+states/<STATE>/data/input/     ← raw files land here (read-only)
     ↓
-  [Claude agent runs, reads this guide]
+  [Claude agent runs clean.py, reads this guide]
     ↓
-automated_processing/data/output/<STATE>/             ← agent writes cleaned CSVs here
+states/<STATE>/output/         ← agent writes cleaned CSVs + judge_report.md here
     ↓
-db/preprocess/                                        ← normalizes + compresses
+db/preprocess/                 ← normalizes + compresses to .csv.gz
     ↓
-db/upload/ --dry-run                                  ← validates without uploading
+db/upload/ --dry-run           ← validates manifest without writing to Firebase
     ↓
-db/upload/                                            ← live Firebase upload
+db/upload/                     ← live Firebase upload
 ```
 
 ---
@@ -373,7 +373,7 @@ assert (df['start_date'] != '').all(), "start_date must not be empty"
 ```python
 import os
 
-output_dir = 'states/<STATE>/data/output/'
+output_dir = 'states/<STATE>/output/'
 os.makedirs(output_dir, exist_ok=True)
 
 df.to_csv(os.path.join(output_dir, '<state>_index.csv'), index=False)
@@ -437,21 +437,32 @@ After joining discipline records to the employment table for context, some offic
 The `suffix` column from demographics tables is often sparsely populated (7–8% fill rate in Georgia). Include it in `full_name` when present: `"smith, john a jr"`. The preprocess pipeline will proper-case the suffix column (`jr` → `Jr`), so leave it lowercase in the cleaning script output.
 
 ### Row count differences against reference outputs
-Reference outputs in `states/<STATE>/data/output/` are point-in-time snapshots. As Dropbox data is updated, row counts will drift — expect ±5% for employment indexes and larger variation for discipline indexes if data coverage has grown. The LLM-as-judge test WARNs but does not fail on row count differences above 5%.
+Reference outputs in `states/<STATE>/data/groundtruth/` are point-in-time snapshots. As Dropbox data is updated, row counts will drift — expect ±5% for employment indexes and larger variation for discipline indexes if data coverage has grown. The LLM-as-judge test WARNs but does not fail on row count differences above 5%.
 
 ---
 
 ## Running the Pipeline After Cleaning
 
-Once the cleaned CSV(s) are in `states/<STATE>/data/output/`:
+Once the cleaned CSV(s) are in `states/<STATE>/output/`:
 
 ```bash
-# Dry run (validate preprocess + print upload summary without writing to Firebase)
-cd db
-make run STATE=<state> DRY_RUN=true
+# Run LLM-as-judge validation (writes states/<STATE>/output/judge_report.md)
+python states/<STATE>/src/test_cleaning.py
+
+# Dry run: preprocess + print upload manifest without writing to Firebase
+cd db && make dry-run STATE=<STATE>
 
 # Live upload (when ready)
-make run STATE=<state>
+cd db && make upload STATE=<STATE>
 ```
 
 See `db/README.md` for full pipeline documentation.
+
+### Ground truth and the test suite
+
+`test_cleaning.py` gracefully degrades based on what's available:
+
+- **With `data/groundtruth/`** (e.g. GA as test case): runs all checks including LLM row-count comparison and side-by-side agency/name scoring against reference.
+- **Without `data/groundtruth/`** (all future states): skips comparison checks and runs schema, date format, and `person_nbr` format checks only. The LLM still evaluates agency name and name parsing quality against general best-practice criteria.
+
+Ground truth is only expected for states that have been manually validated. New states will not have it — that is expected and not an error.

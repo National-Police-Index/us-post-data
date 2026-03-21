@@ -12,10 +12,12 @@ You are a data processing agent. Your job is to clean raw POST (Peace Officer St
 states/
 └── <STATE>/
     ├── data/
-    │   ├── input/     ← raw source files from Dropbox (read-only)
-    │   └── output/    ← reference/ground-truth outputs (read-only, for comparison)
-    ├── output/        ← write your cleaned CSVs here
-    └── clean.py       ← write your cleaning script here
+    │   ├── input/       ← raw source files from Dropbox (read-only)
+    │   └── groundtruth/ ← reference/ground-truth outputs (read-only, for comparison)
+    ├── output/          ← write your cleaned CSVs here (also where judge_report.md lands)
+    └── src/
+        ├── clean.py     ← write your cleaning script here
+        └── test_cleaning.py  ← LLM-as-judge test suite
 ```
 
 Replace `<STATE>` with the two-letter state abbreviation in uppercase (e.g. `GA`, `FL`).
@@ -42,24 +44,23 @@ This file must contain at minimum: `person_nbr`, `first_name`, `last_name`, `age
 
 ## Reference Outputs
 
-Reference outputs (ground truth) are located at:
+Ground-truth reference outputs live at `states/<STATE>/data/groundtruth/` **when available**.
 
-```
-states/<STATE>/data/output/
-```
+- **GA (test case)**: ground truth is present. The test suite runs full comparison checks.
+- **All other states**: no ground truth. The test suite falls back to schema, date, and `person_nbr` format checks plus LLM quality scoring without a reference list. This is expected — do not treat missing ground truth as an error.
 
-Use these to validate your output schema and spot-check values. Your output does not need to be identical row-for-row (source data may have been updated), but the columns and general data patterns should match.
+Use reference files (when present) to spot-check values. Your output does not need to be identical row-for-row (source data may have been updated since the snapshot was taken).
 
 ---
 
 ## Cleaning Script
 
-Write a self-contained `states/<STATE>/clean.py` that:
+Write a self-contained `states/<STATE>/src/clean.py` that:
 1. Reads from `states/<STATE>/data/input/`
 2. Performs all cleaning (see DATA_PREPROCESSING.md for patterns)
 3. Writes output to `states/<STATE>/output/`
 
-The script should be runnable as `python states/<STATE>/clean.py` from the repo root, or with paths adjusted accordingly.
+The script should be runnable as `python states/<STATE>/src/clean.py` from the repo root.
 
 ---
 
@@ -121,10 +122,21 @@ Before writing output files, verify:
 
 ## After You Write the Output
 
-Report:
-1. Row count of each output file
-2. Data quality warnings (empty required fields, duplicate rows, etc.)
-3. Column list for each output file
-4. State-specific decisions or assumptions made
+1. Run the LLM-as-judge test suite:
+   ```bash
+   python states/<STATE>/src/test_cleaning.py
+   ```
+   This writes `states/<STATE>/output/judge_report.md` with per-check scores. Review it before proceeding. The suite must **PASS** or **WARN** (not FAIL) to continue.
 
-The next step is: `cd db && make dry-run STATE=<STATE>` to validate preprocessing.
+2. Report to the user:
+   - Row count of each output file
+   - Data quality warnings (empty required fields, duplicate rows, etc.)
+   - Column list for each output file
+   - State-specific decisions or assumptions made
+   - LLM judge scores from `judge_report.md`
+
+3. Run the dry-run pipeline:
+   ```bash
+   cd db && make dry-run STATE=<STATE>
+   ```
+   This preprocesses the cleaned CSVs and prints the upload manifest without writing to Firebase.
