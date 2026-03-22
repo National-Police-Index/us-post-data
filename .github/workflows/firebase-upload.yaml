@@ -1,0 +1,66 @@
+name: Firebase Upload
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "pipeline/data/registry.csv"
+
+jobs:
+  upload:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Write Firebase service account key
+        run: |
+          echo '${{ secrets.FIREBASE_SERVICE_ACCOUNT_JSON }}' \
+            > db/upload/serviceAccountKey.json
+
+      - name: Upload latest year per changed state
+        env:
+          AZURE_ENDPOINT: ${{ secrets.AZURE_ENDPOINT }}
+          AZURE_API_KEY: ${{ secrets.AZURE_API_KEY }}
+          API_VERSION: ${{ secrets.API_VERSION }}
+        run: |
+          python - <<'EOF'
+          import csv, subprocess, sys
+
+          with open("pipeline/data/registry.csv") as f:
+              rows = list(csv.DictReader(f))
+
+          # Find latest cleaned+unpushed year per state
+          targets = {}
+          for row in rows:
+              if row["cleaned"] == "yes" and row["firebase_pushed"] == "no":
+                  state = row["state"]
+                  year = row["year"]
+                  if state not in targets or year > targets[state]:
+                      targets[state] = year
+
+          if not targets:
+              print("Nothing to upload.")
+              sys.exit(0)
+
+          for state, year in targets.items():
+              print(f"Uploading {state}/{year}...")
+              subprocess.run(
+                  ["make", "upload", f"STATE={state.upper()}",
+                   f"YEAR={year}"],
+                  cwd="db", check=True,
+              )
+          EOF
+
+      - name: Remove service account key
+        if: always()
+        run: rm -f db/upload/serviceAccountKey.json
