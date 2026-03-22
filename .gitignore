@@ -9,6 +9,13 @@ archive/
 normalized-archive/
 *.tsx
 *.json
+
+# pipeline/data/ is tracked (manifest, registry, groundtruth reference)
+!pipeline/data/
+!pipeline/data/.gitkeep
+!pipeline/data/registry.csv
+!pipeline/data/manifest.json
+!pipeline/data/groundtruth.md
 preprocess/download
 entity-resolution/
 input
