@@ -81,6 +81,7 @@ class CCAgent:
     def run(self, state: str, year: str) -> CleanResult:
         prior = self._find_prior_clean_py(state, year)
         prompt = self._build_prompt(state, year, prior_clean_py=prior)
+        env = {k: v for k, v in os.environ.items() if k != "CLAUDECODE"}
         try:
             proc = subprocess.run(
                 ["claude", "--print", prompt],
@@ -88,6 +89,7 @@ class CCAgent:
                 capture_output=True,
                 text=True,
                 timeout=600,
+                env=env,
             )
         except FileNotFoundError:
             return CleanResult(

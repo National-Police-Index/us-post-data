@@ -76,14 +76,17 @@ class PRGenerator:
         base: str = "main",
     ) -> None:
         label = ", ".join(f"{r.state}/{r.year}" for r in results)
-        subprocess.run(
-            [
-                "gh", "pr", "create",
-                "--title", f"data: automated POST update — {label}",
-                "--body", build_pr_body(results),
-                "--base", base,
-                "--head", branch,
-            ],
-            cwd=self._repo_root,
-            check=True,
-        )
+        try:
+            subprocess.run(
+                [
+                    "gh", "pr", "create",
+                    "--title", f"data: automated POST update — {label}",
+                    "--body", build_pr_body(results),
+                    "--base", base,
+                    "--head", branch,
+                ],
+                cwd=self._repo_root,
+                check=True,
+            )
+        except FileNotFoundError:
+            print("  gh CLI not found — skipping PR creation.")
