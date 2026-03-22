@@ -54,7 +54,8 @@ class CCAgent:
             )
         )
         base = (
-            f"Read states/AGENT_INSTRUCTIONS.md and DATA_PREPROCESSING.md. "
+            f"Read AGENT_INSTRUCTIONS.md and DATA_PREPROCESSING.md in full "
+            f"before doing anything else. "
             f"Process state {state}, year {year}: "
             f"inspect states/{state}/{year}/data/input/, "
             f"write states/{state}/{year}/src/clean.py accepting "
