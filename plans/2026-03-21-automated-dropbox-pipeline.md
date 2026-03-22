@@ -2,6 +2,14 @@
 
 > **For Claude:** REQUIRED SUB-SKILL: Use superpowers:executing-plans to implement this plan task-by-task.
 
+> **Status (2026-03-22):** All 12 tasks implemented on branch `ai-dropbox-claude-integration`. 51 tests passing.
+> Key deviations from original plan:
+> - `test_cleaning.py` renamed to `validate.py` throughout
+> - `judge_parser.py` reads `judge_report.json` (preferred) with markdown fallback; `validate.py` must write both formats
+> - `validate.py` is required (not optional) — `clean_runner.py` errors if missing
+> - `pipeline/data/` gitignore exceptions added (was blocked by `data/` and `*.csv`/`*.json` rules)
+> - `RcloneClient` default remote changed to `dropbox:post-db-test` for local dev/testing
+
 **Goal:** Poll Dropbox for new POST data using rclone, detect changes per `(state, year)` pair, run cleaning pipelines (using Claude Code for new state+year combos), open a GitHub PR, and trigger a Firebase upload on merge (latest year only per state).
 
 **Architecture:** A Python `pipeline/` package handles change detection (via `rclone lsjson` + a git-tracked manifest), file syncing, clean-script execution, and PR creation. A `registry.csv` tracks cleaned/firebase status per `(state, year)` and enables manifest pre-seeding for already-processed pairs.
@@ -134,7 +142,7 @@ RCLONE_REMOTE=dropbox:post-db-test python -m pipeline.main --states ga ca
 
 ---
 
-## Task 1: StateManifest — persist rclone lsjson snapshots per (state, year)
+## Task 1: StateManifest — persist rclone lsjson snapshots per (state, year) ✅
 
 **Files:**
 - Create: `pipeline/__init__.py` (empty)
@@ -306,7 +314,7 @@ git commit -m "feat(pipeline): add StateManifest keyed by (state, year)"
 
 ---
 
-## Task 2: rclone client — list_years, lsjson, copy
+## Task 2: rclone client — list_years, lsjson, copy ✅
 
 **Files:**
 - Create: `pipeline/rclone_client.py`
@@ -549,7 +557,7 @@ git commit -m "feat(pipeline): add RcloneClient with list_years, lsjson, copy pe
 
 ---
 
-## Task 3: Registry — track (state, year) cleaning and Firebase status
+## Task 3: Registry — track (state, year) cleaning and Firebase status ✅
 
 **Files:**
 - Create: `pipeline/registry.py`
@@ -746,7 +754,7 @@ git commit -m "feat(pipeline): add Registry, groundtruth.md quality reference"
 
 ---
 
-## Task 4: Judge report parser
+## Task 4: Judge report parser ✅
 
 **Files:**
 - Create: `pipeline/judge_parser.py`
@@ -834,7 +842,7 @@ git commit -m "feat(pipeline): add judge_parser"
 
 ---
 
-## Task 5: Clean runner — run clean.py + test_cleaning.py per (state, year)
+## Task 5: Clean runner — run clean.py + validate.py per (state, year) ✅
 
 Scripts run with `cwd=states/<state>/<year>/`. `clean.py` receives
 `--input-dir data/input --output-dir output` so all relative paths resolve.
@@ -1007,7 +1015,7 @@ git commit -m "feat(pipeline): add CleanRunner with (state, year) paths and CLI 
 
 ---
 
-## Task 6: CC agent — invoke Claude Code for new (state, year) pairs
+## Task 6: CC agent — invoke Claude Code for new (state, year) pairs ✅
 
 For a new year of an existing state: find the most recent prior year's
 `clean.py` and include it as context in the prompt (adapt, don't copy blindly).
@@ -1208,7 +1216,7 @@ git commit -m "feat(pipeline): add CCAgent with prior-year context for new (stat
 
 ---
 
-## Task 7: PR generator — commit outputs and open a GitHub PR
+## Task 7: PR generator — commit outputs and open a GitHub PR ✅
 
 `CleanResult` now carries `year`; PR body rows show `state/year`.
 
@@ -1371,7 +1379,7 @@ git commit -m "feat(pipeline): add PRGenerator (state/year aware)"
 
 ---
 
-## Task 8: Orchestrator — wire everything together
+## Task 8: Orchestrator — wire everything together ✅
 
 **Files:**
 - Create: `pipeline/orchestrate.py`
@@ -1589,7 +1597,7 @@ git commit -m "feat(pipeline): add Orchestrator with preseed, (state, year) proc
 
 ---
 
-## Task 9: CLI entry point
+## Task 9: CLI entry point ✅
 
 **File:** Create `pipeline/main.py`
 
@@ -1630,7 +1638,7 @@ git commit -m "feat(pipeline): add CLI entry point"
 
 ---
 
-## Task 10: GitHub Action — scheduled rclone poller
+## Task 10: GitHub Action — scheduled rclone poller ✅
 
 **File:** Create `.github/workflows/dropbox-poll.yaml`
 
@@ -1706,7 +1714,7 @@ git commit -m "ci: add scheduled rclone polling workflow"
 
 ---
 
-## Task 11: GitHub Action — Firebase upload on merge
+## Task 11: GitHub Action — Firebase upload on merge ✅
 
 Detects which states changed, determines the latest year per state from
 `registry.csv`, and uploads only that year.
@@ -1791,7 +1799,7 @@ git commit -m "ci: add Firebase upload workflow (latest year per state)"
 
 ---
 
-## Task 12: README
+## Task 12: README ✅
 
 **File:** Create `pipeline/README.md`
 
