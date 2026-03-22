@@ -8,7 +8,7 @@ import subprocess
 class RcloneClient:
     def __init__(
         self,
-        remote: str = "dropbox:national-post-db",
+        remote: str = "dropbox:post-db-test",
         states_root: str = "states",
     ):
         self._remote = remote.rstrip("/")
