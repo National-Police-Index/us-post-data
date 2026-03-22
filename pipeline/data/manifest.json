@@ -1,0 +1,74 @@
+{
+  "ca": {
+    "2025": {
+      "CPRA_R000301-011425__ADHOC-809.xlsx": {
+        "mtime": "2025-04-30T01:29:02Z",
+        "size": 27725111
+      }
+    }
+  },
+  "ga": {
+    "2025": {
+      "academy_list.csv": {
+        "mtime": "2025-01-07T22:22:19Z",
+        "size": 5424
+      },
+      "agency_data.csv": {
+        "mtime": "2025-01-07T22:22:18Z",
+        "size": 178483
+      },
+      "course_codes_current.csv": {
+        "mtime": "2025-01-07T22:22:19Z",
+        "size": 521387
+      },
+      "course_codes_legacy.csv": {
+        "mtime": "2025-01-07T22:22:19Z",
+        "size": 7483332
+      },
+      "officer_certifications.csv": {
+        "mtime": "2025-01-07T22:22:19Z",
+        "size": 22133612
+      },
+      "officer_data.csv": {
+        "mtime": "2025-01-07T22:22:17Z",
+        "size": 19615671
+      },
+      "officer_employment.csv": {
+        "mtime": "2025-01-07T22:22:17Z",
+        "size": 60845179
+      },
+      "officer_instructor_certifications.csv": {
+        "mtime": "2025-01-07T22:22:14Z",
+        "size": 1664325
+      },
+      "officer_investigations.csv": {
+        "mtime": "2025-01-07T22:22:14Z",
+        "size": 2955924
+      },
+      "officer_registrations.csv": {
+        "mtime": "2025-01-07T22:22:14Z",
+        "size": 1321367
+      },
+      "officer_sanctions.csv": {
+        "mtime": "2025-01-07T22:22:14Z",
+        "size": 3231555
+      },
+      "officer_training.csv": {
+        "mtime": "2025-01-07T22:22:14Z",
+        "size": 759674133
+      },
+      "officer_violations.csv": {
+        "mtime": "2025-01-07T22:21:55Z",
+        "size": 4816264
+      },
+      "reciprocity.csv": {
+        "mtime": "2025-01-07T22:21:53Z",
+        "size": 19681
+      },
+      "reciprocity.xlsx": {
+        "mtime": "2025-01-07T22:21:52Z",
+        "size": 26209
+      }
+    }
+  }
+}
