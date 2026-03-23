@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 import os
 from datetime import date
 
@@ -9,6 +10,8 @@ from pipeline.pr_generator import PRGenerator
 from pipeline.rclone_client import RcloneClient
 from pipeline.registry import Registry
 from pipeline.state_manifest import StateManifest
+
+logger = logging.getLogger(__name__)
 
 
 class Orchestrator:
@@ -46,48 +49,61 @@ class Orchestrator:
             try:
                 years = self._rclone.list_years(state)
             except RuntimeError as e:
-                print(f"  [{state}] list_years error: {e}")
+                logger.info(f"  [{state}] list_years error: {e}")
                 continue
             for year in years:
                 try:
                     entries = self._rclone.lsjson(state, year)
                 except RuntimeError as e:
-                    print(f"  [{state}/{year}] lsjson error: {e}")
+                    logger.info(f"  [{state}/{year}] lsjson error: {e}")
                     continue
                 lsjson_cache[(state, year)] = entries
                 if self._manifest.changed_files(state, year, entries):
                     changed_pairs.append((state, year))
 
         if not changed_pairs:
-            print("No changes detected.")
+            logger.info("No changes detected.")
             return
 
-        print(f"Changed pairs: {changed_pairs}")
+        logger.info(f"Changed pairs: {changed_pairs}")
 
-        # 3. Copy input (and groundtruth if available on remote)
+        # 3. Copy input (and readme/groundtruth if available on remote)
+        seen_states: set[str] = set()
         for state, year in changed_pairs:
+            if state not in seen_states:
+                seen_states.add(state)
+                if self._rclone.has_readme(state):
+                    logger.info(
+                        "[%s] Dropbox readme/ found — syncing", state
+                    )
+                    try:
+                        self._rclone.copy_readme(state)
+                    except RuntimeError as e:
+                        logger.warning(
+                            "[%s] readme copy error: %s", state, e
+                        )
             try:
                 self._rclone.copy(state, year)
             except RuntimeError as e:
-                print(f"  [{state}/{year}] copy error: {e}")
+                logger.info(f"  [{state}/{year}] copy error: {e}")
             if self._rclone.has_groundtruth(state, year):
-                print(
+                logger.info(
                     f"  [{state}/{year}] Dropbox output/ found"
                     f" — syncing groundtruth"
                 )
                 try:
                     self._rclone.copy_groundtruth(state, year)
                 except RuntimeError as e:
-                    print(f"  [{state}/{year}] groundtruth copy error: {e}")
+                    logger.info(f"  [{state}/{year}] groundtruth copy error: {e}")
 
         # 4. Clean each changed (state, year)
         results: list[CleanResult] = []
         for state, year in changed_pairs:
-            print(f"  Cleaning {state}/{year}...")
+            logger.info(f"  Cleaning {state}/{year}...")
             if self._runner.has_clean_script(state, year):
                 result = self._runner.run(state, year)
             else:
-                print(f"    No clean.py — invoking CC agent")
+                logger.info(f"    No clean.py — invoking CC agent")
                 result = self._cc_agent.run(state, year)
             results.append(result)
             status = (
@@ -95,7 +111,7 @@ class Orchestrator:
                 if result.success
                 else (result.error or result.judge.overall)
             )
-            print(f"  [{state}/{year}] {status}")
+            logger.info(f"  [{state}/{year}] {status}")
             if result.success:
                 self._registry.upsert(state, year, cleaned="yes")
 
@@ -121,7 +137,7 @@ class Orchestrator:
                 entries = self._rclone.lsjson(state, year)
                 self._manifest.update_from_lsjson(state, year, entries)
             except RuntimeError as e:
-                print(f"  [preseed {state}/{year}] {e}")
+                logger.info(f"  [preseed {state}/{year}] {e}")
 
     def _discover_states(self) -> list[str]:
         return [
