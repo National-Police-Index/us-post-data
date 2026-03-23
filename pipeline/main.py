@@ -45,6 +45,11 @@ def main() -> None:
         nargs="+",
         help="Lowercase state codes to poll (default: all)",
     )
+    parser.add_argument(
+        "--no-pr",
+        action="store_true",
+        help="Skip git branch creation and PR (for local testing)",
+    )
     args = parser.parse_args()
 
     log_path = _setup_logging()
@@ -56,7 +61,7 @@ def main() -> None:
         rclone_remote=os.environ.get(
             "RCLONE_REMOTE", "dropbox:post-db-test"
         ),
-    ).run(states=args.states)
+    ).run(states=args.states, no_pr=args.no_pr)
 
 
 if __name__ == "__main__":

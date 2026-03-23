@@ -35,7 +35,9 @@ class Orchestrator:
         self._pr_gen = PRGenerator(repo_root=repo_root)
         self._states_root = states_root
 
-    def run(self, states: list[str] | None = None) -> None:
+    def run(
+        self, states: list[str] | None = None, no_pr: bool = False
+    ) -> None:
         all_states = states or self._discover_states()
 
         # 1. Pre-seed manifest from registry (no cleaning for these)
@@ -121,7 +123,10 @@ class Orchestrator:
         self._manifest.save()
         self._registry.save()
 
-        # 6. Commit outputs + open PR
+        # 6. Commit outputs + open PR (skipped with --no-pr)
+        if no_pr:
+            logger.info("--no-pr set: skipping branch creation and PR")
+            return
         branch = f"data/dropbox-update/{date.today().isoformat()}"
         self._pr_gen.commit_outputs(
             [(r.state, r.year) for r in results], branch
