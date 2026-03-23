@@ -90,3 +90,6 @@ class PRGenerator:
             )
         except FileNotFoundError:
             print("  gh CLI not found — skipping PR creation.")
+        except subprocess.CalledProcessError as e:
+            print(f"  gh pr create failed (exit {e.returncode})"
+                  " — skipping PR creation.")
