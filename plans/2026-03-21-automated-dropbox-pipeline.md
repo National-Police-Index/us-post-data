@@ -2,13 +2,47 @@
 
 > **For Claude:** REQUIRED SUB-SKILL: Use superpowers:executing-plans to implement this plan task-by-task.
 
-> **Status (2026-03-22):** All 12 tasks implemented on branch `ai-dropbox-claude-integration`. 51 tests passing.
-> Key deviations from original plan:
+> **Status (2026-03-23):** All 12 tasks implemented + post-implementation fixes + CA end-to-end validated. 56 tests passing.
+> Branch: `ai-dropbox-claude-integration` (not yet pushed to origin).
+>
+> **Original deviations (carried over):**
 > - `test_cleaning.py` renamed to `validate.py` throughout
 > - `judge_parser.py` reads `judge_report.json` (preferred) with markdown fallback; `validate.py` must write both formats
 > - `validate.py` is required (not optional) — `clean_runner.py` errors if missing
 > - `pipeline/data/` gitignore exceptions added (was blocked by `data/` and `*.csv`/`*.json` rules)
 > - `RcloneClient` default remote changed to `dropbox:post-db-test` for local dev/testing
+>
+> **Post-implementation fixes (2026-03-22 evening):**
+> - **Logging added throughout** — `pipeline/logs/` directory created; all modules use Python `logging`; `pipeline/main.py` sets up FileHandler (DEBUG) + StreamHandler (INFO) writing to `pipeline/logs/pipeline-<timestamp>.log`
+> - **CC agent rewritten** — replaced `subprocess.Popen(["claude", "--print", ...])` with Anthropic Python SDK tool-use loop. Root cause: `claude --print` exits 0 with empty stdout when called from within an existing Claude Code session. SDK uses `ANTHROPIC_API_KEY` env var (set in `states/helpers/.env` for local dev, GitHub secret in CI).
+> - **SDK tool-use loop** — `cc_agent.py` defines tools (`read_file`, `write_file`, `append_to_file`, `edit_file`, `bash`), `MAX_TURNS=100`, `MAX_TOKENS=16384`, `MODEL=claude-sonnet-4-6`. Each turn streamed to `pipeline/logs/cc-agent-<state>-<year>-<ts>.log` with `buffering=1`.
+> - **`pr_generator.py`** — `gh pr create` failure now caught as `CalledProcessError` so pipeline doesn't crash when `gh` isn't authenticated.
+> - **`pyproject.toml`** — `anthropic>=0.46.0` added as dependency.
+>
+> **2026-03-23 fixes:**
+> - **`append_to_file` + `edit_file` tools added to CC agent** — agent no longer needs to write the full file in one response; builds scripts incrementally. Prompt updated to enforce writing by turn 3.
+> - **`MAX_TOKENS` raised to 16384** — safety net for large responses.
+> - **`readmes/<STATE>_README.md` wired into CC agent** — `_has_readme()` checks `readmes/<STATE>_README.md` locally; prompt includes path when present. Previously the agent had no access to state-specific context.
+> - **`DATA_PREPROCESSING.md` updated** — paths now include `<year>`, `test_cleaning.py` → `validate.py` throughout, Step 13 shows argparse pattern.
+> - **`AGENT_INSTRUCTIONS.md` updated** — dir tree shows `readmes/` at repo root, new "State README" section.
+> - **`CLAUDE.md` updated** — reflects automated pipeline, correct paths, CC agent docs, secrets table.
+> - **`rclone_client.py`** — added `has_readme()` and `copy_readme()` for potential future Dropbox-hosted readmes (currently unused; local `readmes/` dir takes precedence).
+> - **Orchestrator** — fetches Dropbox readme once per unique state if present.
+> - **56 tests passing** (added `test_append_to_file_creates_and_appends`, `test_edit_file_replaces_string`, `test_edit_file_errors_when_string_not_found`).
+>
+> **CA end-to-end validation (2026-03-23):**
+> - Both input files present: `CPRA_R000301-011425__ADHOC-809.xlsx` (POST/LEO) + `PDSQ118B-C_CDCR Appts&Seps 2005-2023_Final.csv` (corrections)
+> - CC agent finished in 88 turns — PASS, 26/26 checks
+> - Output: 595,260 rows (LEO: 451,552 exact match; CDCR: 143,708 / 1.8% diff vs GT)
+> - 96.9% key match rate on (person_nbr, agency_name, start_date)
+>
+> **Current state / next steps:**
+> - `states/ca/2025/` — clean.py + validate.py written by agent, output/ has PASS judge report
+> - `pipeline/data/registry.csv` — ca/2025 marked cleaned=yes
+> - `pipeline/data/manifest.json` — ca/2025 snapshot stored
+> - GA not yet tested end-to-end (input dir empty)
+> - Branch has uncommitted changes — commit and push when ready
+> - To run GA: `set -a && source states/helpers/.env && set +a && RCLONE_REMOTE=dropbox:post-db-test python3 -m pipeline.main --states ga`
 
 **Goal:** Poll Dropbox for new POST data using rclone, detect changes per `(state, year)` pair, run cleaning pipelines (using Claude Code for new state+year combos), open a GitHub PR, and trigger a Firebase upload on merge (latest year only per state).
 
@@ -1015,77 +1049,40 @@ git commit -m "feat(pipeline): add CleanRunner with (state, year) paths and CLI 
 
 ---
 
-## Task 6: CC agent — invoke Claude Code for new (state, year) pairs ✅
+## Task 6: CC agent — Anthropic SDK tool-use loop for new (state, year) pairs ✅
+
+> **DEVIATION:** Original plan used `claude --print <prompt>` via subprocess.
+> This was replaced with the **Anthropic Python SDK tool-use loop** because
+> `claude --print` exits 0 with empty stdout when invoked from inside a Claude
+> Code session. The SDK approach also works correctly in GitHub Actions CI
+> (just needs `ANTHROPIC_API_KEY`).
 
 For a new year of an existing state: find the most recent prior year's
 `clean.py` and include it as context in the prompt (adapt, don't copy blindly).
 For a brand-new state: fresh prompt.
 
+**Key design:**
+- `anthropic.Anthropic()` client, model `claude-sonnet-4-6`, `MAX_TURNS=100`
+- Tools: `read_file`, `write_file`, `bash` (cwd=repo_root)
+- Each turn streamed to `pipeline/logs/cc-agent-<state>-<year>-<ts>.log` with `buffering=1`
+- Prompt tells agent: sample files with `head`/bash, do NOT read full CSVs, write clean.py early, stop on PASS/WARN
+- Requires `ANTHROPIC_API_KEY` in env (`states/helpers/.env` locally, GitHub secret in CI)
+- `pyproject.toml`: `anthropic>=0.46.0` added
+
 **Files:**
 - Create: `pipeline/cc_agent.py`
 - Create: `tests/pipeline/test_cc_agent.py`
+- Update: `pyproject.toml` (add `anthropic>=0.46.0`)
 
-**Step 1: Write the failing tests**
-
-```python
-# tests/pipeline/test_cc_agent.py
-import os, tempfile
-from unittest.mock import patch, MagicMock
-from pipeline.cc_agent import CCAgent
-
-FAKE_REPORT = "**Overall result:** `PASS`\n"
-
-
-def _make_out(root, state, year):
-    out = os.path.join(root, state, year, "output")
-    os.makedirs(out, exist_ok=True)
-    with open(os.path.join(out, "judge_report.md"), "w") as f:
-        f.write(FAKE_REPORT)
-
-
-def test_prompt_includes_state_and_year():
-    prompt = CCAgent()._build_prompt("ca", "2025", prior_clean_py=None)
-    assert "ca" in prompt and "2025" in prompt
-
-
-def test_prompt_includes_prior_clean_py():
-    prompt = CCAgent()._build_prompt("ga", "2025",
-                                     prior_clean_py="# prior script")
-    assert "prior script" in prompt
-
-
-def test_run_invokes_claude_cli():
-    with tempfile.TemporaryDirectory() as d:
-        _make_out(d, "ca", "2025")
-        agent = CCAgent(states_root=d)
-        with patch("subprocess.run") as mock_run:
-            mock_run.return_value = MagicMock(returncode=0)
-            agent.run("ca", "2025")
-        assert mock_run.call_args[0][0][0] == "claude"
-
-
-def test_run_returns_error_when_claude_missing():
-    with tempfile.TemporaryDirectory() as d:
-        agent = CCAgent(states_root=d)
-        with patch("subprocess.run", side_effect=FileNotFoundError):
-            result = agent.run("ca", "2025")
-        assert result.error is not None and "claude" in result.error.lower()
-
-
-def test_run_finds_prior_year_clean_py():
-    with tempfile.TemporaryDirectory() as d:
-        prior_src = os.path.join(d, "ga", "2024", "src")
-        os.makedirs(prior_src)
-        with open(os.path.join(prior_src, "clean.py"), "w") as f:
-            f.write("# 2024 clean script")
-        _make_out(d, "ga", "2025")
-        agent = CCAgent(states_root=d)
-        with patch("subprocess.run") as mock_run:
-            mock_run.return_value = MagicMock(returncode=0)
-            agent.run("ga", "2025")
-        prompt = mock_run.call_args[0][0][-1]
-        assert "2024 clean script" in prompt
-```
+**Tests (53 total, patch target: `pipeline.cc_agent.anthropic.Anthropic`):**
+- `test_prompt_includes_state_and_year`
+- `test_prompt_includes_prior_clean_py`
+- `test_prompt_references_validate_and_json_schema`
+- `test_run_invokes_sdk_client`
+- `test_run_returns_error_on_api_error`
+- `test_run_finds_prior_year_clean_py`
+- `test_run_tool_use_loop_executes_two_turns`
+- `test_run_max_turns_returns_gracefully`
 
 **Step 2: Run tests to verify they fail**
 

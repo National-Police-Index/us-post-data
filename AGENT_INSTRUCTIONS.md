@@ -13,6 +13,9 @@ State codes are **lowercase everywhere**. Each `(state, year)` is fully
 self-contained:
 
 ```
+readmes/
+└── <STATE>_README.md  ← state-specific README (read-only, when available)
+
 states/
 └── <state>/
     └── <year>/
@@ -24,6 +27,15 @@ states/
             ├── clean.py      ← write your cleaning script here
             └── validate.py   ← LLM-as-judge test suite
 ```
+
+---
+
+## State README (when available)
+
+If `readmes/<STATE>_README.md` exists (e.g. `readmes/CA_README.md`),
+**read it before writing `clean.py`**. It provides state-specific context
+about the raw data format, column names, file layout, and known quirks that
+supplements `DATA_PREPROCESSING.md`.
 
 ---
 
