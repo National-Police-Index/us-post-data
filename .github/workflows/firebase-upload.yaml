@@ -5,6 +5,7 @@ on:
     branches: [main]
     paths:
       - "pipeline/data/registry.csv"
+  workflow_dispatch:
 
 jobs:
   upload:
@@ -113,11 +114,12 @@ jobs:
 
       - name: Commit updated registry
         run: |
-          git pull --rebase origin main
+          git fetch origin main
+          git rebase origin/main
           git add pipeline/data/registry.csv
           git diff --cached --quiet || \
             git commit -m "data: mark firebase_pushed after upload [skip ci]"
-          git push
+          git push origin HEAD:main
 
       - name: Remove service account key
         if: always()
