@@ -4,7 +4,7 @@ import logging
 import os
 import subprocess
 import sys
-from datetime import date
+from datetime import datetime
 
 from pipeline.cc_agent import CCAgent
 from pipeline.clean_runner import CleanResult, CleanRunner
@@ -126,7 +126,7 @@ class Orchestrator:
         if no_pr:
             logger.info("--no-pr set: skipping branch creation and PR")
             return
-        branch = f"data/dropbox-update/{date.today().isoformat()}"
+        branch = f"data/dropbox-update/{datetime.now().strftime('%Y%m%d-%H%M%S')}"
         self._pr_gen.commit_outputs(
             [(r.state, r.year) for r in results], branch
         )
