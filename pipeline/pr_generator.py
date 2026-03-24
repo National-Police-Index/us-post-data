@@ -6,6 +6,7 @@ from datetime import date
 
 from pipeline.clean_runner import CleanResult
 
+
 logger = logging.getLogger(__name__)
 
 
@@ -64,7 +65,8 @@ class PRGenerator:
             )
         for state, year in pairs:
             r = self._git(
-                "add", "--force",
+                "add",
+                "--force",
                 f"db/data/output/{state}/",
                 f"states/{state}/{year}/src/clean.py",
                 f"states/{state}/{year}/src/validate.py",
@@ -74,7 +76,8 @@ class PRGenerator:
                     "git add for %s/%s: %s", state, year, r.stderr.strip()
                 )
         r = self._git(
-            "add", "--force",
+            "add",
+            "--force",
             "pipeline/data/manifest.json",
             "pipeline/data/registry.csv",
         )
@@ -83,7 +86,9 @@ class PRGenerator:
         status = self._git("status", "--short")
         logger.info("git status before commit:\n%s", status.stdout.strip())
         label = ", ".join(f"{s}/{y}" for s, y in pairs)
-        r = self._git("commit", "-m", f"data: automated POST update for {label}")
+        r = self._git(
+            "commit", "-m", f"data: automated POST update for {label}"
+        )
         if r.returncode != 0:
             raise RuntimeError(
                 f"git commit failed: {r.stderr.strip() or r.stdout.strip()}"

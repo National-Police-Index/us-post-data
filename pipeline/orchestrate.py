@@ -126,7 +126,9 @@ class Orchestrator:
         if no_pr:
             logger.info("--no-pr set: skipping branch creation and PR")
             return
-        branch = f"data/dropbox-update/{datetime.now().strftime('%Y%m%d-%H%M%S')}"
+        branch = (
+            f"data/dropbox-update/{datetime.now().strftime('%Y%m%d-%H%M%S')}"
+        )
         self._pr_gen.commit_outputs(
             [(r.state, r.year) for r in results], branch
         )
@@ -188,12 +190,8 @@ class Orchestrator:
             and d.islower()
             and d.isalpha()
             and any(
-                os.path.isdir(
-                    os.path.join(self._states_root, d, y)
-                )
-                for y in os.listdir(
-                    os.path.join(self._states_root, d)
-                )
+                os.path.isdir(os.path.join(self._states_root, d, y))
+                for y in os.listdir(os.path.join(self._states_root, d))
                 if y.isdigit()
             )
         ]
