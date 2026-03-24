@@ -32,9 +32,7 @@ class RcloneClient:
         )
         if proc.returncode != 0:
             logger.error("rclone lsjson failed for root: %s", proc.stderr)
-            raise RuntimeError(
-                f"rclone lsjson failed for root: {proc.stderr}"
-            )
+            raise RuntimeError(f"rclone lsjson failed for root: {proc.stderr}")
         entries = json.loads(proc.stdout or "[]")
         states = [
             e["Name"]

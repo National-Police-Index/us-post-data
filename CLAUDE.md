@@ -150,3 +150,4 @@ The `document_id` field (`<state>_<person_nbr>`) and `state` field are added by 
 - Line length: 80 characters
 - Formatters: `ruff` (linter), `black` (formatter), `isort` (imports)
 - CI runs pre-commit on all pushes/PRs to `main` and `dev`
+- **Always run `make lint` before committing.** CI will fail if pre-commit hooks find issues. Run until all hooks pass, then commit.
