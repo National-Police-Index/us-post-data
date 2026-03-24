@@ -113,10 +113,10 @@ jobs:
 
       - name: Commit updated registry
         run: |
+          git pull --rebase origin main
           git add pipeline/data/registry.csv
           git diff --cached --quiet || \
             git commit -m "data: mark firebase_pushed after upload [skip ci]"
-          git pull --rebase origin main
           git push
 
       - name: Remove service account key
