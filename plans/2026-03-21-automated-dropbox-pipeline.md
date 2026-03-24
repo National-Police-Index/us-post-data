@@ -53,35 +53,33 @@
 > - `.github/workflows/firebase-upload.yaml` — rewritten: reads registry for targets, uploads committed `.csv.gz` directly (no preprocess in CI), updates `registry.csv` (`firebase_pushed=yes`/`skipped`), commits back with `[skip ci]`.
 > - 66 tests passing (10 new: 6 in `tests/db/test_preprocess.py`, 4 in pipeline tests).
 >
-> **Remaining steps (2026-03-24, updated):**
+> **Status (2026-03-24, final):** Full pipeline validated end-to-end in CI and locally.
 >
-> **Completed so far:**
+> **All completed:**
 > - GA end-to-end local test: WARN 21/22 checks, 480k employment + 42k discipline rows ✅
 > - Local Firebase upload test (post-test-auto, partial — stopped early) ✅
 > - Firestore data deleted via new `db/delete/` script ✅
 > - Branch merged to main via PR #73 ✅
 > - 7 GitHub Actions secrets configured ✅
 > - firebase-upload.yaml triggered on merge → "Nothing to upload" (expected no-op) ✅
-> - `anthropic` added to requirements.txt (was missing, caused ModuleNotFoundError in CI) ✅
-> - Repo Actions permissions set to read/write (needed for bot commits) ✅
-> - RCLONE_CONFIG fix: switched from `echo` to `printf '%s'` via env var in dropbox-poll.yaml ✅
-> - `_discover_states()` fixed to exclude `helpers` and any dir without year subdirs ✅
-> - CI run (ca): CC agent PASS 63 turns, preprocess complete — PR creation failed (permissions) ✅
+> - `anthropic` added to requirements.txt ✅
+> - Repo Actions permissions set to read/write ✅
+> - RCLONE_CONFIG: switched from `echo` to `printf '%s'` via env var ✅
+> - `_discover_states()` fixed to exclude non-state dirs ✅
 > - GitHub Actions PR creation permissions enabled ✅
-> - `commit_outputs` fixed: error handling, logging, `--force` on git add, explicit push ✅
+> - `commit_outputs` fixed: error handling, logging, `--force`, explicit push ✅
 > - Branch name uses timestamp to avoid same-day conflicts ✅
-> - PR body now includes full judge_report.md content per state ✅
-> - AZ end-to-end local test: CC agent WARN 27 turns, preprocess complete, PR #75 opened ✅
->   (PR #75 has full judge report — pending merge + Firebase upload verification)
+> - PR body includes full judge_report.md content per state ✅
+> - judge_parser: uses .md content as `raw` even when .json is present ✅
+> - AZ end-to-end local test: CC agent WARN 27-29 turns, preprocess, PR created ✅
+> - AZ CI test (dropbox-poll.yaml): full remote pipeline works, PR created ✅
 >
-> **Remaining steps:**
-> 1. Merge PR #75 (AZ) → firebase-upload.yaml auto-triggers → verify AZ docs in Firestore db_launch ✅
-> 2. Verify Firebase upload succeeded (check post-test-auto Firestore).
-> 3. Cleanup for production:
->    - Remove `--limit 1000` from firebase-upload.yaml and db/upload/src/src.py
->    - Revert cron from `0 * * * *` to `0 6 * * *` in dropbox-poll.yaml
->    - Update `RCLONE_REMOTE` secret from `dropbox:post-db-test` → `dropbox:national-post-db`
->    - Restructure production Dropbox remote to year-based paths (e.g. `az/2025/input/`)
+> **Remaining steps (production cutover):**
+> 1. Merge AZ data PR → firebase-upload.yaml auto-triggers → verify docs in Firestore db_launch.
+> 2. Remove `--limit 1000` from `firebase-upload.yaml` and `db/upload/src/src.py`.
+> 3. Revert cron from `0 * * * *` to `0 6 * * *` in `dropbox-poll.yaml`.
+> 4. Update `RCLONE_REMOTE` secret: `dropbox:post-db-test` → `dropbox:national-post-db`.
+> 5. Restructure production Dropbox remote to year-based paths (e.g. `state/2025/input/`).
 
 **Goal:** Poll Dropbox for new POST data using rclone, detect changes per `(state, year)` pair, run cleaning pipelines (using Claude Code for new state+year combos), open a GitHub PR, and trigger a Firebase upload on merge (latest year only per state).
 
