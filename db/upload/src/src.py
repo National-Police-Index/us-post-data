@@ -103,7 +103,7 @@ def delete_state_data(db, prefix):
     print(f"  Deleted {deleted} documents")
 
 
-def upload_file(file_path, prefix, force=False, batch_size=1000, dry_run=False):
+def upload_file(file_path, prefix, force=False, batch_size=1000, dry_run=False, limit=None):
     from google.api_core.exceptions import DeadlineExceeded, ResourceExhausted
     from tenacity import (
         retry,
@@ -114,11 +114,13 @@ def upload_file(file_path, prefix, force=False, batch_size=1000, dry_run=False):
 
     if dry_run:
         row_count = count_rows(file_path)
+        effective = min(row_count, limit) if limit else row_count
         print(
-            f"  [DRY RUN] Would upload {row_count:,} rows as prefix '{prefix}'"
+            f"  [DRY RUN] Would upload {effective:,} rows as prefix '{prefix}'"
+            + (f" (capped at {limit:,})" if limit and limit < row_count else "")
         )
         print(f"  [DRY RUN] First doc ID would be: {prefix}_0")
-        print(f"  [DRY RUN] Last doc ID would be:  {prefix}_{row_count - 1}")
+        print(f"  [DRY RUN] Last doc ID would be:  {prefix}_{effective - 1}")
         return "dry_run"
 
     db = _get_db()
@@ -144,6 +146,8 @@ def upload_file(file_path, prefix, force=False, batch_size=1000, dry_run=False):
     for csv_batch in read_csv_gz_in_batches(file_path, batch_size):
         fb_batch = db.batch()
         for row in csv_batch:
+            if limit and total >= limit:
+                break
             doc_ref = db.collection("db_launch").document(f"{prefix}_{total}")
             fb_batch.set(doc_ref, row)
             total += 1
@@ -151,6 +155,9 @@ def upload_file(file_path, prefix, force=False, batch_size=1000, dry_run=False):
         time.sleep(1)
         elapsed = time.time() - start_time
         print(f"  Committed {total:,} docs ({total / elapsed:.0f} rows/s)")
+        if limit and total >= limit:
+            print(f"  Reached limit of {limit:,} rows — stopping.")
+            break
 
     elapsed = time.time() - start_time
     print(f"  Finished: {total:,} docs in {elapsed:.1f}s")
@@ -219,6 +226,13 @@ def main():
             "No Firebase credentials required."
         ),
     )
+    parser.add_argument(
+        "--limit",
+        type=int,
+        default=None,
+        metavar="N",
+        help="Cap upload at N rows per file (for testing)",
+    )
     args = parser.parse_args()
 
     if not args.dry_run:
@@ -246,6 +260,7 @@ def main():
                 prefix,
                 force=args.force,
                 dry_run=args.dry_run,
+                limit=args.limit,
             )
             results[status].append(prefix)
         except Exception as e:

@@ -69,6 +69,7 @@ jobs:
                       "--input-dir", "../data/output",
                       "--states", state,
                       "--force",
+                      "--limit", "1000",
                   ],
                   cwd="db/upload",
                   check=False,
