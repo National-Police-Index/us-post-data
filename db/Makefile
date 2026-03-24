@@ -6,10 +6,12 @@
 #   make upload STATE=GA            — live upload one state
 #   make upload                     — live upload all states
 #   make force-upload STATE=GA      — re-upload, deleting existing data first
+#   make delete                     — delete ALL data from Firestore db_launch
+#   make delete STATE=GA            — delete only GA data from Firestore
 
 STATE :=
 
-.PHONY: preprocess dry-run upload force-upload
+.PHONY: preprocess dry-run upload force-upload delete
 
 preprocess:
 	$(MAKE) -C preprocess run $(if $(STATE),STATE=$(STATE))
@@ -22,3 +24,6 @@ upload: preprocess
 
 force-upload: preprocess
 	$(MAKE) -C upload run-force $(if $(STATE),STATE=$(STATE))
+
+delete:
+	$(MAKE) -C delete run $(if $(STATE),STATE=$(STATE))
