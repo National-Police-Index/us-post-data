@@ -2,7 +2,7 @@ name: Dropbox Poll
 
 on:
   schedule:
-    - cron: "0 6 * * *"
+    - cron: "0 * * * *"
   workflow_dispatch:
     inputs:
       states:
@@ -35,9 +35,6 @@ jobs:
         run: |
           mkdir -p ~/.config/rclone
           echo "${{ secrets.RCLONE_CONFIG }}" > ~/.config/rclone/rclone.conf
-
-      - name: Install Claude Code CLI
-        run: npm install -g @anthropic-ai/claude-code
 
       - name: Configure git
         run: |
