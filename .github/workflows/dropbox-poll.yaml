@@ -32,9 +32,11 @@ jobs:
         run: curl https://rclone.org/install.sh | sudo bash
 
       - name: Configure rclone
+        env:
+          RCLONE_CONFIG_CONTENT: ${{ secrets.RCLONE_CONFIG }}
         run: |
           mkdir -p ~/.config/rclone
-          echo "${{ secrets.RCLONE_CONFIG }}" > ~/.config/rclone/rclone.conf
+          printf '%s' "$RCLONE_CONFIG_CONTENT" > ~/.config/rclone/rclone.conf
 
       - name: Configure git
         run: |

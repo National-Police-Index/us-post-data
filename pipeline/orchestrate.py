@@ -187,4 +187,13 @@ class Orchestrator:
             if os.path.isdir(os.path.join(self._states_root, d))
             and d.islower()
             and d.isalpha()
+            and any(
+                os.path.isdir(
+                    os.path.join(self._states_root, d, y)
+                )
+                for y in os.listdir(
+                    os.path.join(self._states_root, d)
+                )
+                if y.isdigit()
+            )
         ]
