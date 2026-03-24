@@ -114,8 +114,10 @@ jobs:
 
       - name: Commit updated registry
         run: |
+          git stash
           git fetch origin main
           git rebase origin/main
+          git stash pop
           git add pipeline/data/registry.csv
           git diff --cached --quiet || \
             git commit -m "data: mark firebase_pushed after upload [skip ci]"
