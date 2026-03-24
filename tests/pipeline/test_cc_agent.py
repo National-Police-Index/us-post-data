@@ -5,7 +5,8 @@ from unittest.mock import MagicMock, patch
 
 import anthropic
 
-from pipeline.cc_agent import CCAgent, MAX_TURNS
+from pipeline.cc_agent import MAX_TURNS, CCAgent
+
 
 FAKE_REPORT = {"overall": "PASS", "has_groundtruth": True}
 
@@ -48,6 +49,7 @@ def _mock_client(responses: list) -> MagicMock:
 
 # --- prompt tests (unchanged) ---
 
+
 def test_prompt_includes_state_and_year():
     prompt = CCAgent()._build_prompt("ca", "2025", prior_clean_py=None)
     assert "ca" in prompt and "2025" in prompt
@@ -67,6 +69,7 @@ def test_prompt_references_validate_and_json_schema():
 
 
 # --- run() tests ---
+
 
 def test_run_invokes_sdk_client():
     with tempfile.TemporaryDirectory() as d:
@@ -137,17 +140,23 @@ def test_append_to_file_creates_and_appends():
         agent = CCAgent(states_root=d, repo_root=d)
         turn1 = _response(
             "tool_use",
-            [_tool_use_block(
-                "tu_1", "append_to_file",
-                {"path": "out.py", "content": "import os\n"},
-            )],
+            [
+                _tool_use_block(
+                    "tu_1",
+                    "append_to_file",
+                    {"path": "out.py", "content": "import os\n"},
+                )
+            ],
         )
         turn2 = _response(
             "tool_use",
-            [_tool_use_block(
-                "tu_2", "append_to_file",
-                {"path": "out.py", "content": "print('hi')\n"},
-            )],
+            [
+                _tool_use_block(
+                    "tu_2",
+                    "append_to_file",
+                    {"path": "out.py", "content": "print('hi')\n"},
+                )
+            ],
         )
         turn3 = _response("end_turn", [_text_block("Done.")])
         with patch("pipeline.cc_agent.anthropic.Anthropic") as mock_cls:
@@ -167,14 +176,17 @@ def test_edit_file_replaces_string():
         agent = CCAgent(states_root=d, repo_root=d)
         turn1 = _response(
             "tool_use",
-            [_tool_use_block(
-                "tu_1", "edit_file",
-                {
-                    "path": "script.py",
-                    "old_string": "x = 1",
-                    "new_string": "x = 99",
-                },
-            )],
+            [
+                _tool_use_block(
+                    "tu_1",
+                    "edit_file",
+                    {
+                        "path": "script.py",
+                        "old_string": "x = 1",
+                        "new_string": "x = 99",
+                    },
+                )
+            ],
         )
         turn2 = _response("end_turn", [_text_block("Done.")])
         with patch("pipeline.cc_agent.anthropic.Anthropic") as mock_cls:
@@ -194,14 +206,17 @@ def test_edit_file_errors_when_string_not_found():
         agent = CCAgent(states_root=d, repo_root=d)
         turn1 = _response(
             "tool_use",
-            [_tool_use_block(
-                "tu_1", "edit_file",
-                {
-                    "path": "script.py",
-                    "old_string": "z = 99",
-                    "new_string": "z = 0",
-                },
-            )],
+            [
+                _tool_use_block(
+                    "tu_1",
+                    "edit_file",
+                    {
+                        "path": "script.py",
+                        "old_string": "z = 99",
+                        "new_string": "z = 0",
+                    },
+                )
+            ],
         )
         turn2 = _response("end_turn", [_text_block("Done.")])
         with patch("pipeline.cc_agent.anthropic.Anthropic") as mock_cls:

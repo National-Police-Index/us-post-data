@@ -2,10 +2,11 @@ import json
 import os
 import tempfile
 
-from pipeline.judge_parser import parse_judge_report, load_judge_report
+from pipeline.judge_parser import load_judge_report, parse_judge_report
 
 
 # ── parse_judge_report (JSON input) ──────────────────────────────────────────
+
 
 def test_parse_pass_json():
     r = parse_judge_report(
@@ -37,6 +38,7 @@ def test_no_groundtruth_flag_json():
 
 # ── parse_judge_report (markdown fallback) ────────────────────────────────────
 
+
 def test_parse_pass_markdown_fallback():
     r = parse_judge_report("**Overall result:** `PASS`\n")
     assert r.overall == "PASS" and r.passed is True
@@ -50,6 +52,7 @@ def test_no_groundtruth_markdown_fallback():
 
 
 # ── load_judge_report ─────────────────────────────────────────────────────────
+
 
 def test_load_prefers_json_over_md():
     with tempfile.TemporaryDirectory() as d:
@@ -72,5 +75,6 @@ def test_load_falls_back_to_md():
 def test_load_raises_when_neither_exists():
     with tempfile.TemporaryDirectory() as d:
         import pytest
+
         with pytest.raises(FileNotFoundError):
             load_judge_report(d)

@@ -43,6 +43,21 @@
 > - GA not yet tested end-to-end (input dir empty)
 > - Branch has uncommitted changes — commit and push when ready
 > - To run GA: `set -a && source states/helpers/.env && set +a && RCLONE_REMOTE=dropbox:post-db-test python3 -m pipeline.main --states ga`
+>
+> **Tasks 13–16 complete (2026-03-23): preprocess → commit → Firebase upload data flow fixed.**
+> - `db/preprocess/src/src.py` — `find_index_files` now takes `year`; reads `states/<state>/<year>/output/`. `--year` CLI arg added (required with `--states`). Makefile updated with `YEAR` var.
+> - `.gitignore` — `!db/data/output/**` exception added after the `output` rule so `.csv.gz` files are committable.
+> - `db/data/output/.gitkeep` — directory created and tracked.
+> - `pipeline/orchestrate.py` — `_run_preprocess(state, year)` called after each successful clean; `self._repo_root` stored.
+> - `pipeline/pr_generator.py` — `commit_outputs` stages `db/data/output/<state>/` instead of `states/<state>/<year>/output/`.
+> - `.github/workflows/firebase-upload.yaml` — rewritten: reads registry for targets, uploads committed `.csv.gz` directly (no preprocess in CI), updates `registry.csv` (`firebase_pushed=yes`/`skipped`), commits back with `[skip ci]`.
+> - 66 tests passing (10 new: 6 in `tests/db/test_preprocess.py`, 4 in pipeline tests).
+>
+> **Remaining steps:**
+> 1. GA end-to-end test (local, `--no-pr`)
+> 2. Commit all changes + push `ai-dropbox-claude-integration` + open PR against `main`
+> 3. Configure 7 GitHub Actions secrets
+> 4. Production smoke test via `workflow_dispatch`
 
 **Goal:** Poll Dropbox for new POST data using rclone, detect changes per `(state, year)` pair, run cleaning pipelines (using Claude Code for new state+year combos), open a GitHub PR, and trigger a Firebase upload on merge (latest year only per state).
 
@@ -1878,7 +1893,7 @@ git commit -m "docs(pipeline): add README with directory structure and secrets g
 
 ---
 
-## Final verification
+## Final verification (Tasks 1–12)
 
 ```bash
 pytest tests/pipeline/ -v
@@ -1889,6 +1904,276 @@ for f in ['.github/workflows/dropbox-poll.yaml',
           '.github/workflows/firebase-upload.yaml']:
     yaml.safe_load(open(f))
     print(f, 'OK')
+"
+make lint
+```
+
+---
+
+## Task 13: Fix db/preprocess for year-scoped input paths ⬜
+
+**Problem:** `find_index_files` looks in `states/<state>/output/` but the pipeline writes to
+`states/<state>/<year>/output/`. Also no way to specify which year to process.
+
+**Design:** `db/data/output/<state>/` has no year dimension — intentional. Only one `.csv.gz`
+per state at any time (always latest year's data). Registry is the source of truth for which
+year that is. When a newer year is processed, the `.csv.gz` is overwritten.
+
+**File:** `db/preprocess/src/src.py`
+
+Changes:
+- Add `--year` CLI argument (required when `--states` is used; ignored when scanning all states)
+- Update `find_index_files(input_dir, state_name)` → `find_index_files(input_dir, state_name, year)`
+- Path: `os.path.join(input_dir, state_name, year, "output")` instead of `os.path.join(input_dir, state_name, "output")`
+- Output path unchanged: `db/data/output/<state>/<state>-processed.csv.gz`
+
+**Also update:** `db/preprocess/Makefile` — add `YEAR :=` variable, pass `$(if $(YEAR),--year $(YEAR))` to the script.
+
+**Tests:** `tests/db/test_preprocess.py` (new file) covering `find_index_files` with year arg.
+
+**Commit:**
+```bash
+git add db/preprocess/src/src.py db/preprocess/Makefile tests/db/test_preprocess.py
+git commit -m "feat(preprocess): add --year arg for year-scoped input paths"
+```
+
+---
+
+## Task 14: Add preprocess step to orchestrator + pr_generator ⬜
+
+**Problem:** After cleaning, orchestrator does not run preprocess. `pr_generator.py` commits
+raw output CSVs (gitignored) instead of `.csv.gz` files.
+
+**Design:** Pipeline runs preprocess immediately after a successful clean, producing
+`db/data/output/<state>/*.csv.gz`. The PR commits those `.csv.gz` files (not raw CSVs).
+
+**Files:** `pipeline/orchestrate.py`, `pipeline/pr_generator.py`
+
+Changes to `orchestrate.py`:
+- After `result.success`, call preprocess for that (state, year):
+  ```python
+  subprocess.run(
+      [
+          sys.executable, "-m", "db.preprocess.src.src",
+          "--input-dir", self._states_root,
+          "--states", state,
+          "--year", year,
+          "--output-dir", os.path.join(self._repo_root, "db", "data", "output"),
+          "--force",
+      ],
+      cwd=self._repo_root, check=True,
+  )
+  ```
+  (Or invoke via `make preprocess STATE=<state> YEAR=<year>` from `db/` — whichever is simpler.)
+
+Changes to `pr_generator.py`:
+- In `commit_outputs`, replace `states/{state}/{year}/output/` with `db/data/output/{state}/`
+- Still commit: `states/{state}/{year}/src/clean.py`, `states/{state}/{year}/src/validate.py`,
+  `pipeline/data/manifest.json`, `pipeline/data/registry.csv`
+- Remove: `states/{state}/{year}/output/` (gitignored, not needed in repo)
+
+**Tests:** Update `tests/pipeline/test_orchestrate.py` and `tests/pipeline/test_pr_generator.py`.
+
+**Commit:**
+```bash
+git add pipeline/orchestrate.py pipeline/pr_generator.py \
+        tests/pipeline/test_orchestrate.py tests/pipeline/test_pr_generator.py
+git commit -m "feat(pipeline): run preprocess after clean, commit .csv.gz to PR"
+```
+
+---
+
+## Task 15: Fix .gitignore for db/data/output ⬜
+
+**Problem:** `data/` on line 5 of `.gitignore` catches `db/data/output/`, so `.csv.gz` files
+there are never committed.
+
+**File:** `.gitignore`
+
+Add exceptions after the existing `pipeline/data/` exceptions block:
+```
+# db/data/output: preprocessed .csv.gz files committed for Firebase upload
+!db/data/
+!db/data/output/
+!db/data/output/**
+```
+
+Also create the directory so git tracks it:
+```bash
+mkdir -p db/data/output
+touch db/data/output/.gitkeep
+```
+
+**Commit:**
+```bash
+git add .gitignore db/data/output/.gitkeep
+git commit -m "chore: un-ignore db/data/output for .csv.gz Firebase upload files"
+```
+
+---
+
+## Task 16: Rewrite firebase-upload.yaml ⬜
+
+**Problems with current version:**
+- Ran preprocess in CI but source CSVs aren't in the repo (gitignored)
+- Never updated `registry.csv` after upload (`firebase_pushed` stayed `no` forever)
+- Passed `YEAR` to make but make ignored it
+
+**New design:**
+1. Read `registry.csv` → find `cleaned=yes, firebase_pushed=no` per state, pick highest year
+2. Upload `db/data/output/<state>/*.csv.gz` directly (already preprocessed + committed)
+3. After successful upload: update `registry.csv` — set target year to `firebase_pushed=yes`,
+   set all older `cleaned=yes` years for that state to `firebase_pushed=skipped`
+4. Commit updated `registry.csv` back to `main`
+
+**File:** `.github/workflows/firebase-upload.yaml`
+
+```yaml
+name: Firebase Upload
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "pipeline/data/registry.csv"
+
+jobs:
+  upload:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Write Firebase service account key
+        run: |
+          echo '${{ secrets.FIREBASE_SERVICE_ACCOUNT_JSON }}' \
+            > db/upload/serviceAccountKey.json
+
+      - name: Configure git
+        run: |
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git config user.name "github-actions[bot]"
+
+      - name: Upload and mark registry
+        env:
+          AZURE_ENDPOINT: ${{ secrets.AZURE_ENDPOINT }}
+          AZURE_API_KEY: ${{ secrets.AZURE_API_KEY }}
+          API_VERSION: ${{ secrets.API_VERSION }}
+        run: |
+          python - <<'EOF'
+          import csv, os, subprocess, sys
+
+          registry_path = "pipeline/data/registry.csv"
+
+          with open(registry_path, newline="") as f:
+              rows = list(csv.DictReader(f))
+
+          # Find highest cleaned+unpushed year per state
+          targets = {}
+          for row in rows:
+              if row["cleaned"] == "yes" and row["firebase_pushed"] == "no":
+                  state = row["state"]
+                  year = row["year"]
+                  if state not in targets or year > targets[state]:
+                      targets[state] = year
+
+          if not targets:
+              print("Nothing to upload.")
+              sys.exit(0)
+
+          uploaded = []
+          for state, year in targets.items():
+              output_dir = os.path.join("db", "data", "output", state)
+              if not os.path.isdir(output_dir):
+                  print(f"[{state}] No .csv.gz found in {output_dir} — skipping")
+                  continue
+              print(f"Uploading {state} (year={year})...")
+              result = subprocess.run(
+                  [
+                      "python3", "src/src.py",
+                      "--input-dir", "../data/output",
+                      "--states", state,
+                      "--force",
+                  ],
+                  cwd="db/upload", check=False,
+              )
+              if result.returncode != 0:
+                  print(f"[{state}] Upload failed — registry not updated")
+                  continue
+              uploaded.append((state, year))
+
+          if not uploaded:
+              print("No states uploaded successfully.")
+              sys.exit(1)
+
+          # Update registry.csv
+          updated_rows = []
+          for row in rows:
+              state = row["state"]
+              year = row["year"]
+              if state in dict(uploaded):
+                  target_year = dict(uploaded)[state]
+                  if year == target_year:
+                      row["firebase_pushed"] = "yes"
+                  elif row["cleaned"] == "yes" and row["firebase_pushed"] == "no":
+                      row["firebase_pushed"] = "skipped"
+              updated_rows.append(row)
+
+          with open(registry_path, "w", newline="") as f:
+              writer = csv.DictWriter(
+                  f, fieldnames=["state", "year", "cleaned", "firebase_pushed"]
+              )
+              writer.writeheader()
+              writer.writerows(updated_rows)
+
+          print(f"Updated registry for: {[s for s, _ in uploaded]}")
+          EOF
+
+      - name: Commit updated registry
+        run: |
+          git add pipeline/data/registry.csv
+          git diff --cached --quiet || \
+            git commit -m "data: mark firebase_pushed after upload [skip ci]"
+          git push
+
+      - name: Remove service account key
+        if: always()
+        run: rm -f db/upload/serviceAccountKey.json
+```
+
+**Note:** `[skip ci]` in the commit message prevents the push from re-triggering this workflow.
+
+**Commit:**
+```bash
+git add .github/workflows/firebase-upload.yaml
+git commit -m "ci: rewrite firebase-upload — skip preprocess, update registry after upload"
+```
+
+---
+
+## Final verification (Tasks 13–16)
+
+```bash
+pytest tests/ -v
+# Manually verify .csv.gz gitignore exception works:
+mkdir -p db/data/output/ga && touch db/data/output/ga/ga-processed.csv.gz
+git status db/data/output/  # should show as untracked (not ignored)
+rm db/data/output/ga/ga-processed.csv.gz
+# Validate updated workflow YAML:
+python -c "
+import yaml
+yaml.safe_load(open('.github/workflows/firebase-upload.yaml'))
+print('firebase-upload.yaml OK')
 "
 make lint
 ```

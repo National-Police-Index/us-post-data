@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import logging
 import os
+import subprocess
+import sys
 from datetime import date
 
 from pipeline.cc_agent import CCAgent
@@ -10,6 +12,7 @@ from pipeline.pr_generator import PRGenerator
 from pipeline.rclone_client import RcloneClient
 from pipeline.registry import Registry
 from pipeline.state_manifest import StateManifest
+
 
 logger = logging.getLogger(__name__)
 
@@ -29,15 +32,12 @@ class Orchestrator:
         self._manifest = StateManifest(manifest_path)
         self._registry = Registry(registry_path)
         self._runner = CleanRunner(states_root=states_root)
-        self._cc_agent = CCAgent(
-            states_root=states_root, repo_root=repo_root
-        )
+        self._cc_agent = CCAgent(states_root=states_root, repo_root=repo_root)
         self._pr_gen = PRGenerator(repo_root=repo_root)
         self._states_root = states_root
+        self._repo_root = repo_root
 
-    def run(
-        self, states: list[str] | None = None, no_pr: bool = False
-    ) -> None:
+    def run(self, states: list[str] | None = None, no_pr: bool = False) -> None:
         all_states = states or self._discover_states()
 
         # 1. Pre-seed manifest from registry (no cleaning for these)
@@ -75,15 +75,11 @@ class Orchestrator:
             if state not in seen_states:
                 seen_states.add(state)
                 if self._rclone.has_readme(state):
-                    logger.info(
-                        "[%s] Dropbox readme/ found — syncing", state
-                    )
+                    logger.info("[%s] Dropbox readme/ found — syncing", state)
                     try:
                         self._rclone.copy_readme(state)
                     except RuntimeError as e:
-                        logger.warning(
-                            "[%s] readme copy error: %s", state, e
-                        )
+                        logger.warning("[%s] readme copy error: %s", state, e)
             try:
                 self._rclone.copy(state, year)
             except RuntimeError as e:
@@ -96,7 +92,9 @@ class Orchestrator:
                 try:
                     self._rclone.copy_groundtruth(state, year)
                 except RuntimeError as e:
-                    logger.info(f"  [{state}/{year}] groundtruth copy error: {e}")
+                    logger.info(
+                        f"  [{state}/{year}] groundtruth copy error: {e}"
+                    )
 
         # 4. Clean each changed (state, year)
         results: list[CleanResult] = []
@@ -105,7 +103,7 @@ class Orchestrator:
             if self._runner.has_clean_script(state, year):
                 result = self._runner.run(state, year)
             else:
-                logger.info(f"    No clean.py — invoking CC agent")
+                logger.info("    No clean.py — invoking CC agent")
                 result = self._cc_agent.run(state, year)
             results.append(result)
             status = (
@@ -116,6 +114,7 @@ class Orchestrator:
             logger.info(f"  [{state}/{year}] {status}")
             if result.success:
                 self._registry.upsert(state, year, cleaned="yes")
+                self._run_preprocess(state, year)
 
         # 5. Update manifest + registry and save both
         for (state, year), entries in lsjson_cache.items():
@@ -132,6 +131,43 @@ class Orchestrator:
             [(r.state, r.year) for r in results], branch
         )
         self._pr_gen.create_pr(branch, results)
+
+    def _run_preprocess(self, state: str, year: str) -> None:
+        """Run db/preprocess for (state, year), writing .csv.gz to db/data/output/."""
+        preprocess_script = os.path.join(
+            self._repo_root, "db", "preprocess", "src", "src.py"
+        )
+        output_dir = os.path.join(self._repo_root, "db", "data", "output")
+        try:
+            subprocess.run(
+                [
+                    sys.executable,
+                    preprocess_script,
+                    "--input-dir",
+                    self._states_root,
+                    "--states",
+                    state,
+                    "--year",
+                    year,
+                    "--output-dir",
+                    output_dir,
+                    "--force",
+                ],
+                cwd=self._repo_root,
+                check=True,
+                capture_output=True,
+                text=True,
+            )
+            logger.info(
+                "[%s/%s] preprocess complete → db/data/output/%s/",
+                state,
+                year,
+                state,
+            )
+        except subprocess.CalledProcessError as e:
+            logger.warning(
+                "[%s/%s] preprocess failed: %s", state, year, e.stderr
+            )
 
     def _preseed_manifest(self, all_states: list[str]) -> None:
         """Seed manifest for cleaned pairs that have no manifest entry yet."""

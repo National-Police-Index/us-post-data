@@ -1,9 +1,10 @@
 import json
 import os
 import tempfile
-from unittest.mock import patch, MagicMock
+from unittest.mock import MagicMock, patch
 
 from pipeline.clean_runner import CleanRunner
+
 
 FAKE_REPORT = {"overall": "PASS", "has_groundtruth": False}
 

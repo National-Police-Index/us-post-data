@@ -7,6 +7,7 @@ from dataclasses import dataclass
 
 from pipeline.judge_parser import JudgeResult, load_judge_report
 
+
 logger = logging.getLogger(__name__)
 
 
@@ -20,9 +21,7 @@ class CleanResult:
     @property
     def success(self) -> bool:
         return (
-            self.error is None
-            and self.judge is not None
-            and self.judge.passed
+            self.error is None and self.judge is not None and self.judge.passed
         )
 
 
@@ -62,12 +61,15 @@ class CleanRunner:
             text=True,
         )
         if proc.stdout:
-            logger.debug("[%s/%s] clean.py stdout:\n%s", state, year,
-                         proc.stdout)
+            logger.debug(
+                "[%s/%s] clean.py stdout:\n%s", state, year, proc.stdout
+            )
         if proc.returncode != 0:
             logger.error(
                 "[%s/%s] clean.py failed (exit %d):\n%s",
-                state, year, proc.returncode,
+                state,
+                year,
+                proc.returncode,
                 proc.stderr or "(no stderr)",
             )
             return CleanResult(
@@ -86,12 +88,15 @@ class CleanRunner:
             text=True,
         )
         if vproc.stdout:
-            logger.debug("[%s/%s] validate.py stdout:\n%s", state, year,
-                         vproc.stdout)
+            logger.debug(
+                "[%s/%s] validate.py stdout:\n%s", state, year, vproc.stdout
+            )
         if vproc.returncode != 0:
             logger.warning(
                 "[%s/%s] validate.py exited %d:\n%s",
-                state, year, vproc.returncode,
+                state,
+                year,
+                vproc.returncode,
                 vproc.stderr or "(no stderr)",
             )
 
@@ -99,10 +104,6 @@ class CleanRunner:
             judge = load_judge_report(os.path.join(year_dir, "output"))
         except FileNotFoundError as e:
             logger.error("[%s/%s] %s", state, year, e)
-            return CleanResult(
-                state=state, year=year, judge=None, error=str(e)
-            )
-        logger.info(
-            "[%s/%s] judge report: %s", state, year, judge.overall
-        )
+            return CleanResult(state=state, year=year, judge=None, error=str(e))
+        logger.info("[%s/%s] judge report: %s", state, year, judge.overall)
         return CleanResult(state=state, year=year, judge=judge)

@@ -16,6 +16,7 @@ import gzip
 import os
 import time
 
+
 # Firebase imports are deferred so --dry-run works without credentials
 _firebase_initialized = False
 
@@ -25,7 +26,7 @@ def _init_firebase():
     if _firebase_initialized:
         return
     import firebase_admin
-    from firebase_admin import credentials, firestore as _firestore
+    from firebase_admin import credentials
 
     cred = credentials.Certificate("serviceAccountKey.json")
     firebase_admin.initialize_app(cred)
@@ -34,6 +35,7 @@ def _init_firebase():
 
 def _get_db():
     from firebase_admin import firestore
+
     return firestore.client()
 
 
@@ -68,8 +70,8 @@ def doc_id_prefix(file_path):
     db/data/output/georgia/georgia-discipline-processed.csv.gz
         → "georgia-discipline-processed.csv"
     """
-    basename = os.path.basename(file_path)       # georgia-processed.csv.gz
-    return basename.replace(".gz", "")            # georgia-processed.csv
+    basename = os.path.basename(file_path)  # georgia-processed.csv.gz
+    return basename.replace(".gz", "")  # georgia-processed.csv
 
 
 def check_state_exists(db, prefix):
@@ -102,17 +104,19 @@ def delete_state_data(db, prefix):
 
 
 def upload_file(file_path, prefix, force=False, batch_size=1000, dry_run=False):
+    from google.api_core.exceptions import DeadlineExceeded, ResourceExhausted
     from tenacity import (
         retry,
         retry_if_exception_type,
         stop_after_attempt,
         wait_exponential,
     )
-    from google.api_core.exceptions import DeadlineExceeded, ResourceExhausted
 
     if dry_run:
         row_count = count_rows(file_path)
-        print(f"  [DRY RUN] Would upload {row_count:,} rows as prefix '{prefix}'")
+        print(
+            f"  [DRY RUN] Would upload {row_count:,} rows as prefix '{prefix}'"
+        )
         print(f"  [DRY RUN] First doc ID would be: {prefix}_0")
         print(f"  [DRY RUN] Last doc ID would be:  {prefix}_{row_count - 1}")
         return "dry_run"
@@ -131,7 +135,7 @@ def upload_file(file_path, prefix, force=False, batch_size=1000, dry_run=False):
         if check_state_exists(db, prefix):
             delete_state_data(db, prefix)
     elif check_state_exists(db, prefix):
-        print(f"  Skipping — data already exists (use --force to overwrite)")
+        print("  Skipping — data already exists (use --force to overwrite)")
         return "skipped"
 
     total = 0
@@ -146,10 +150,7 @@ def upload_file(file_path, prefix, force=False, batch_size=1000, dry_run=False):
         commit_batch(fb_batch)
         time.sleep(1)
         elapsed = time.time() - start_time
-        print(
-            f"  Committed {total:,} docs "
-            f"({total / elapsed:.0f} rows/s)"
-        )
+        print(f"  Committed {total:,} docs ({total / elapsed:.0f} rows/s)")
 
     elapsed = time.time() - start_time
     print(f"  Finished: {total:,} docs in {elapsed:.1f}s")
@@ -166,7 +167,8 @@ def find_processed_files(input_dir, states=None):
         return found
 
     state_dirs = [
-        d for d in os.listdir(input_dir)
+        d
+        for d in os.listdir(input_dir)
         if os.path.isdir(os.path.join(input_dir, d))
     ]
     if states:
@@ -178,7 +180,7 @@ def find_processed_files(input_dir, states=None):
         for fname in os.listdir(dir_path):
             if fname.endswith(".csv.gz"):
                 file_path = os.path.join(dir_path, fname)
-                prefix = fname.replace(".gz", "")   # e.g. georgia-processed.csv
+                prefix = fname.replace(".gz", "")  # e.g. georgia-processed.csv
                 found.append((file_path, prefix))
 
     return found

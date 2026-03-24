@@ -5,6 +5,7 @@ import logging
 import os
 import subprocess
 
+
 logger = logging.getLogger(__name__)
 
 
@@ -30,9 +31,7 @@ class RcloneClient:
             text=True,
         )
         if proc.returncode != 0:
-            logger.error(
-                "rclone lsjson failed for %s: %s", state, proc.stderr
-            )
+            logger.error("rclone lsjson failed for %s: %s", state, proc.stderr)
             raise RuntimeError(
                 f"rclone lsjson failed for {state}: {proc.stderr}"
             )
@@ -53,7 +52,9 @@ class RcloneClient:
         if proc.returncode != 0:
             logger.error(
                 "rclone lsjson failed for %s/%s: %s",
-                state, year, proc.stderr,
+                state,
+                year,
+                proc.stderr,
             )
             raise RuntimeError(
                 f"rclone lsjson failed for {state}/{year}: {proc.stderr}"
@@ -62,7 +63,10 @@ class RcloneClient:
         files = [e for e in entries if not e.get("IsDir", False)]
         logger.info(
             "[%s/%s] %d file(s) on remote: %s",
-            state, year, len(files), [f["Name"] for f in files],
+            state,
+            year,
+            len(files),
+            [f["Name"] for f in files],
         )
         return files
 
@@ -98,17 +102,16 @@ class RcloneClient:
         if proc.returncode != 0:
             logger.debug(
                 "[%s/%s] has_groundtruth check failed: %s",
-                state, year, proc.stderr,
+                state,
+                year,
+                proc.stderr,
             )
             return False
         entries = json.loads(proc.stdout or "[]")
         result = any(
-            e["Name"] == "output" and e.get("IsDir", False)
-            for e in entries
+            e["Name"] == "output" and e.get("IsDir", False) for e in entries
         )
-        logger.info(
-            "[%s/%s] groundtruth on remote: %s", state, year, result
-        )
+        logger.info("[%s/%s] groundtruth on remote: %s", state, year, result)
         return result
 
     def has_readme(self, state: str) -> bool:
@@ -124,8 +127,7 @@ class RcloneClient:
             return False
         entries = json.loads(proc.stdout or "[]")
         result = any(
-            e["Name"] == "readme" and e.get("IsDir", False)
-            for e in entries
+            e["Name"] == "readme" and e.get("IsDir", False) for e in entries
         )
         logger.info("[%s] readme on remote: %s", state, result)
         return result
@@ -160,7 +162,10 @@ class RcloneClient:
         src = f"{self._remote}/{state}/{year}/output/"
         logger.info(
             "[%s/%s] rclone copy groundtruth %s → %s",
-            state, year, src, dest,
+            state,
+            year,
+            src,
+            dest,
         )
         proc = subprocess.run(
             ["rclone", "copy", src, dest],
@@ -170,7 +175,9 @@ class RcloneClient:
         if proc.returncode != 0:
             logger.error(
                 "[%s/%s] copy_groundtruth failed: %s",
-                state, year, proc.stderr,
+                state,
+                year,
+                proc.stderr,
             )
             raise RuntimeError(
                 f"rclone copy_groundtruth failed for {state}/{year}: "

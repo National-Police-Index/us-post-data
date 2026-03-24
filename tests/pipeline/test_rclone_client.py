@@ -1,11 +1,12 @@
 import json
 import os
 import tempfile
+from unittest.mock import MagicMock, patch
 
 import pytest
-from unittest.mock import patch, MagicMock
 
 from pipeline.rclone_client import RcloneClient
+
 
 FAKE_FILES = json.dumps(
     [
@@ -97,9 +98,7 @@ def test_has_groundtruth_true_when_output_dir_exists():
         ]
     )
     with patch("subprocess.run") as mock_run:
-        mock_run.return_value = MagicMock(
-            returncode=0, stdout=dirs_with_output
-        )
+        mock_run.return_value = MagicMock(returncode=0, stdout=dirs_with_output)
         assert client.has_groundtruth("ga", "2025") is True
 
 
@@ -107,9 +106,7 @@ def test_has_groundtruth_false_when_no_output_dir():
     client = RcloneClient(remote="dropbox:post-db-test", states_root="states")
     dirs_no_output = json.dumps([{"Name": "input", "IsDir": True}])
     with patch("subprocess.run") as mock_run:
-        mock_run.return_value = MagicMock(
-            returncode=0, stdout=dirs_no_output
-        )
+        mock_run.return_value = MagicMock(returncode=0, stdout=dirs_no_output)
         assert client.has_groundtruth("ga", "2025") is False
 
 

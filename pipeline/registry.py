@@ -3,6 +3,7 @@ from __future__ import annotations
 import csv
 import os
 
+
 _FIELDS = ["state", "year", "cleaned", "firebase_pushed"]
 
 
@@ -34,9 +35,7 @@ class Registry:
 
     def get_preseed_pairs(self) -> list[tuple[str, str]]:
         """Return (state, year) pairs that are cleaned (seed manifest)."""
-        return [
-            k for k, v in self._rows.items() if v.get("cleaned") == "yes"
-        ]
+        return [k for k, v in self._rows.items() if v.get("cleaned") == "yes"]
 
     def upsert(
         self,

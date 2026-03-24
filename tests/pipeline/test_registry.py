@@ -26,9 +26,7 @@ def test_is_cleaned_false():
 
 def test_firebase_pushed_values():
     with tempfile.TemporaryDirectory() as d:
-        r = _reg(
-            d, "xx,2001,yes,yes\nxx,2002,yes,skipped\nxx,2003,no,no\n"
-        )
+        r = _reg(d, "xx,2001,yes,yes\nxx,2002,yes,skipped\nxx,2003,no,no\n")
         assert r.firebase_pushed("xx", "2001") == "yes"
         assert r.firebase_pushed("xx", "2002") == "skipped"
         assert r.firebase_pushed("xx", "2003") == "no"
@@ -37,9 +35,7 @@ def test_firebase_pushed_values():
 
 def test_get_preseed_pairs_returns_cleaned_only():
     with tempfile.TemporaryDirectory() as d:
-        r = _reg(
-            d, "xx,2001,yes,yes\nxx,2002,no,no\nyy,2001,yes,no\n"
-        )
+        r = _reg(d, "xx,2001,yes,yes\nxx,2002,no,no\nyy,2001,yes,no\n")
         pairs = r.get_preseed_pairs()
         assert ("xx", "2001") in pairs  # cleaned=yes
         assert ("yy", "2001") in pairs  # cleaned=yes

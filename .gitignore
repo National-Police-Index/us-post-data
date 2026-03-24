@@ -16,10 +16,16 @@ normalized-archive/
 !pipeline/data/registry.csv
 !pipeline/data/manifest.json
 !pipeline/data/groundtruth.md
+
 preprocess/download
 entity-resolution/
 input
 output
+
+# db/data/output/ is tracked (.csv.gz preprocessed files for Firebase upload)
+!db/data/
+!db/data/output/
+!db/data/output/**
 
 # Secrets
 **/.env

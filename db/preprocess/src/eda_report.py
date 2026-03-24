@@ -16,27 +16,51 @@ import sys
 
 import pandas as pd
 
+
 # Columns to show in the coverage table (in order)
 COVERAGE_COLS = [
-    "person_nbr", "full_name", "first_name", "middle_name", "last_name",
-    "suffix", "agency_name", "rank", "start_date", "end_date", "state",
-    "employment_status", "separation_reason", "current_certificate_status",
-    "type", "offense", "violation", "sanction", "sanction_date", "notes",
-    "race", "sex", "year_of_birth",
+    "person_nbr",
+    "full_name",
+    "first_name",
+    "middle_name",
+    "last_name",
+    "suffix",
+    "agency_name",
+    "rank",
+    "start_date",
+    "end_date",
+    "state",
+    "employment_status",
+    "separation_reason",
+    "current_certificate_status",
+    "type",
+    "offense",
+    "violation",
+    "sanction",
+    "sanction_date",
+    "notes",
+    "race",
+    "sex",
+    "year_of_birth",
 ]
 
 DATE_COLS = ["start_date", "end_date", "violation_date", "sanction_date"]
 DISCIPLINE_COLS = ["violation", "sanction"]
 
 SAMPLE_COLS = [
-    "person_nbr", "first_name", "last_name", "agency_name",
-    "start_date", "end_date",
+    "person_nbr",
+    "first_name",
+    "last_name",
+    "agency_name",
+    "start_date",
+    "end_date",
 ]
 
 
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
+
 
 def _non_empty_pct(series: pd.Series) -> float:
     if len(series) == 0:
@@ -52,11 +76,13 @@ def _pct(n, total):
 def _top_n(series: pd.Series, n: int = 10) -> pd.DataFrame:
     counts = series.replace("", pd.NA).dropna().value_counts().head(n)
     total = len(series)
-    return pd.DataFrame({
-        "value": counts.index,
-        "count": counts.values,
-        "pct": [_pct(c, total) for c in counts.values],
-    })
+    return pd.DataFrame(
+        {
+            "value": counts.index,
+            "count": counts.values,
+            "pct": [_pct(c, total) for c in counts.values],
+        }
+    )
 
 
 def _md_table(df: pd.DataFrame) -> str:
@@ -80,6 +106,7 @@ def _date_range(series: pd.Series) -> str:
 # Report builder
 # ---------------------------------------------------------------------------
 
+
 def build_report(path: str) -> str:
     if not os.path.exists(path):
         return f"_File not found: {path}_\n"
@@ -102,8 +129,9 @@ def build_report(path: str) -> str:
     for col in all_cols:
         pct = _non_empty_pct(df[col])
         uniq = df[col].replace("", pd.NA).nunique()
-        cov_rows.append({"Column": col, "Non-empty": f"{pct:.1f}%",
-                         "Unique": f"{uniq:,}"})
+        cov_rows.append(
+            {"Column": col, "Non-empty": f"{pct:.1f}%", "Unique": f"{uniq:,}"}
+        )
 
     lines.append("### Coverage")
     lines.append(_md_table(pd.DataFrame(cov_rows)))
@@ -177,9 +205,11 @@ def build_report(path: str) -> str:
     # --- Sample rows ---
     sample_cols_present = [c for c in SAMPLE_COLS if c in df.columns]
     if sample_cols_present:
-        sample = df[sample_cols_present].sample(
-            min(5, total), random_state=42
-        ).copy()
+        sample = (
+            df[sample_cols_present]
+            .sample(min(5, total), random_state=42)
+            .copy()
+        )
         if "agency_name" in sample.columns:
             sample["agency_name"] = sample["agency_name"].astype(str).str[:40]
         lines.append("### Sample rows (5 random)")

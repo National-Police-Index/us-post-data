@@ -3,6 +3,7 @@ Usage:
     python -m pipeline.main
     python -m pipeline.main --states ga ca
 """
+
 from __future__ import annotations
 
 import argparse
@@ -58,9 +59,7 @@ def main() -> None:
     from pipeline.orchestrate import Orchestrator
 
     Orchestrator(
-        rclone_remote=os.environ.get(
-            "RCLONE_REMOTE", "dropbox:post-db-test"
-        ),
+        rclone_remote=os.environ.get("RCLONE_REMOTE", "dropbox:post-db-test"),
     ).run(states=args.states, no_pr=args.no_pr)
 
 

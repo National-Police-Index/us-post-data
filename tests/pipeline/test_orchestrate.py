@@ -1,9 +1,9 @@
 import tempfile
-from unittest.mock import patch, MagicMock
+from unittest.mock import patch
 
-from pipeline.orchestrate import Orchestrator
 from pipeline.clean_runner import CleanResult
 from pipeline.judge_parser import JudgeResult
+from pipeline.orchestrate import Orchestrator
 
 
 def _orch(tmp):
@@ -42,9 +42,7 @@ def test_changed_files_trigger_clean_and_pr():
             judge=JudgeResult("PASS", True, True, raw=""),
         )
         with patch.object(orch._rclone, "list_years", return_value=["2025"]):
-            with patch.object(
-                orch._rclone, "lsjson", return_value=fake_lsjson
-            ):
+            with patch.object(orch._rclone, "lsjson", return_value=fake_lsjson):
                 with patch.object(orch._rclone, "copy"):
                     with patch.object(
                         orch._rclone, "has_groundtruth", return_value=False
@@ -65,3 +63,87 @@ def test_changed_files_trigger_clean_and_pr():
                                     ) as mock_pr:
                                         orch.run(states=["ga"])
         mock_pr.assert_called_once()
+
+
+def test_preprocess_called_after_successful_clean():
+    """Orchestrator must run preprocess for each successfully cleaned pair."""
+    with tempfile.TemporaryDirectory() as d:
+        orch = _orch(d)
+        fake_lsjson = [
+            {
+                "Name": "officer_employment.csv",
+                "Size": 100,
+                "ModTime": "2026-03-21T10:00:00Z",
+            }
+        ]
+        fake_result = CleanResult(
+            state="ga",
+            year="2025",
+            judge=JudgeResult("PASS", True, True, raw=""),
+        )
+        with patch.object(orch._rclone, "list_years", return_value=["2025"]):
+            with patch.object(orch._rclone, "lsjson", return_value=fake_lsjson):
+                with patch.object(orch._rclone, "copy"):
+                    with patch.object(
+                        orch._rclone, "has_groundtruth", return_value=False
+                    ):
+                        with patch.object(
+                            orch._runner,
+                            "has_clean_script",
+                            return_value=True,
+                        ):
+                            with patch.object(
+                                orch._runner, "run", return_value=fake_result
+                            ):
+                                with patch.object(
+                                    orch._pr_gen, "commit_outputs"
+                                ):
+                                    with patch.object(
+                                        orch._pr_gen, "create_pr"
+                                    ):
+                                        with patch.object(
+                                            orch, "_run_preprocess"
+                                        ) as mock_pre:
+                                            orch.run(states=["ga"])
+        mock_pre.assert_called_once_with("ga", "2025")
+
+
+def test_preprocess_not_called_when_clean_fails():
+    """Orchestrator must not run preprocess when cleaning fails."""
+    with tempfile.TemporaryDirectory() as d:
+        orch = _orch(d)
+        fake_lsjson = [
+            {
+                "Name": "officer_employment.csv",
+                "Size": 100,
+                "ModTime": "2026-03-21T10:00:00Z",
+            }
+        ]
+        fake_result = CleanResult(
+            state="ga", year="2025", judge=None, error="clean.py failed"
+        )
+        with patch.object(orch._rclone, "list_years", return_value=["2025"]):
+            with patch.object(orch._rclone, "lsjson", return_value=fake_lsjson):
+                with patch.object(orch._rclone, "copy"):
+                    with patch.object(
+                        orch._rclone, "has_groundtruth", return_value=False
+                    ):
+                        with patch.object(
+                            orch._runner,
+                            "has_clean_script",
+                            return_value=True,
+                        ):
+                            with patch.object(
+                                orch._runner, "run", return_value=fake_result
+                            ):
+                                with patch.object(
+                                    orch._pr_gen, "commit_outputs"
+                                ):
+                                    with patch.object(
+                                        orch._pr_gen, "create_pr"
+                                    ):
+                                        with patch.object(
+                                            orch, "_run_preprocess"
+                                        ) as mock_pre:
+                                            orch.run(states=["ga"])
+        mock_pre.assert_not_called()

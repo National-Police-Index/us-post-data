@@ -17,9 +17,7 @@ class StateManifest:
             with open(path) as f:
                 self._data = json.load(f)
 
-    def get_entry(
-        self, state: str, year: str, filename: str
-    ) -> dict | None:
+    def get_entry(self, state: str, year: str, filename: str) -> dict | None:
         return self._data.get(state, {}).get(year, {}).get(filename)
 
     def set_entry(
@@ -30,9 +28,10 @@ class StateManifest:
         size: int,
         mtime: str,
     ) -> None:
-        self._data.setdefault(state, {}).setdefault(year, {})[
-            filename
-        ] = {"size": size, "mtime": mtime}
+        self._data.setdefault(state, {}).setdefault(year, {})[filename] = {
+            "size": size,
+            "mtime": mtime,
+        }
 
     def update_from_lsjson(
         self, state: str, year: str, entries: list[dict]

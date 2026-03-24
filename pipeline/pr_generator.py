@@ -18,8 +18,7 @@ def build_pr_body(results: list[CleanResult]) -> str:
     for r in results:
         if r.error:
             lines.append(
-                f"| {r.state} | {r.year} | FAIL | — "
-                f"| `{r.error[:80]}` |"
+                f"| {r.state} | {r.year} | FAIL | — | `{r.error[:80]}` |"
             )
         else:
             gt = "Yes" if r.judge.has_groundtruth else "⚠️ No ground truth"
@@ -50,14 +49,12 @@ class PRGenerator:
             text=True,
         )
 
-    def commit_outputs(
-        self, pairs: list[tuple[str, str]], branch: str
-    ) -> None:
+    def commit_outputs(self, pairs: list[tuple[str, str]], branch: str) -> None:
         self._git("checkout", "-b", branch)
         for state, year in pairs:
             self._git(
                 "add",
-                f"states/{state}/{year}/output/",
+                f"db/data/output/{state}/",
                 f"states/{state}/{year}/src/clean.py",
                 f"states/{state}/{year}/src/validate.py",
             )
@@ -79,11 +76,17 @@ class PRGenerator:
         try:
             subprocess.run(
                 [
-                    "gh", "pr", "create",
-                    "--title", f"data: automated POST update — {label}",
-                    "--body", build_pr_body(results),
-                    "--base", base,
-                    "--head", branch,
+                    "gh",
+                    "pr",
+                    "create",
+                    "--title",
+                    f"data: automated POST update — {label}",
+                    "--body",
+                    build_pr_body(results),
+                    "--base",
+                    base,
+                    "--head",
+                    branch,
                 ],
                 cwd=self._repo_root,
                 check=True,
@@ -91,5 +94,7 @@ class PRGenerator:
         except FileNotFoundError:
             print("  gh CLI not found — skipping PR creation.")
         except subprocess.CalledProcessError as e:
-            print(f"  gh pr create failed (exit {e.returncode})"
-                  " — skipping PR creation.")
+            print(
+                f"  gh pr create failed (exit {e.returncode})"
+                " — skipping PR creation."
+            )

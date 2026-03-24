@@ -10,6 +10,7 @@ import anthropic
 from pipeline.clean_runner import CleanResult
 from pipeline.judge_parser import load_judge_report
 
+
 logger = logging.getLogger(__name__)
 
 MAX_TURNS = 100
@@ -133,9 +134,7 @@ TOOLS: list[dict] = [
 
 
 class CCAgent:
-    def __init__(
-        self, states_root: str = "states", repo_root: str = "."
-    ):
+    def __init__(self, states_root: str = "states", repo_root: str = "."):
         self._states_root = states_root
         self._repo_root = repo_root
 
@@ -185,9 +184,9 @@ class CCAgent:
             f"validate.py for row count and value comparison."
             if has_gt
             else (
-                f"No CSV groundtruth exists for this state. Use "
-                f"pipeline/data/groundtruth.md as your quality reference "
-                f"when writing validate.py."
+                "No CSV groundtruth exists for this state. Use "
+                "pipeline/data/groundtruth.md as your quality reference "
+                "when writing validate.py."
             )
         )
         readme_note = (
@@ -249,8 +248,7 @@ class CCAgent:
                 with open(path) as f:
                     content = f.read()
                 lf.write(
-                    f"[tool:read_file] {inp['path']}"
-                    f" ({len(content)} chars)\n"
+                    f"[tool:read_file] {inp['path']} ({len(content)} chars)\n"
                 )
                 lf.flush()
                 return content, False
@@ -269,8 +267,7 @@ class CCAgent:
                 with open(path, "w") as f:
                     f.write(content)
                 lf.write(
-                    f"[tool:write_file] {inp['path']}"
-                    f" ({len(content)} chars)\n"
+                    f"[tool:write_file] {inp['path']} ({len(content)} chars)\n"
                 )
                 lf.flush()
                 return f"Wrote {len(content)} chars to {inp['path']}", False
@@ -382,7 +379,10 @@ class CCAgent:
 
         logger.info(
             "[%s/%s] invoking SDK tool-use loop (model=%s, → %s)",
-            state, year, MODEL, log_path,
+            state,
+            year,
+            MODEL,
+            log_path,
         )
         logger.debug("[%s/%s] prompt:\n%s", state, year, prompt)
 
@@ -422,7 +422,9 @@ class CCAgent:
                         lf.write("\n=== AGENT FINISHED (end_turn) ===\n")
                         logger.info(
                             "[%s/%s] agent finished in %d turn(s)",
-                            state, year, turn + 1,
+                            state,
+                            year,
+                            turn + 1,
                         )
                         break
 
@@ -433,7 +435,9 @@ class CCAgent:
                         )
                         logger.warning(
                             "[%s/%s] unexpected stop_reason: %s",
-                            state, year, response.stop_reason,
+                            state,
+                            year,
+                            response.stop_reason,
                         )
                         break
 
@@ -445,74 +449,70 @@ class CCAgent:
                             block, lf, repo_root
                         )
                         lf.write(
-                            f"[tool_result] id={block.id}"
-                            f" error={is_error}\n"
+                            f"[tool_result] id={block.id} error={is_error}\n"
                         )
                         lf.flush()
-                        tool_results.append({
-                            "type": "tool_result",
-                            "tool_use_id": block.id,
-                            "content": result_text,
-                            "is_error": is_error,
-                        })
+                        tool_results.append(
+                            {
+                                "type": "tool_result",
+                                "tool_use_id": block.id,
+                                "content": result_text,
+                                "is_error": is_error,
+                            }
+                        )
 
-                    messages.append(
-                        {"role": "user", "content": tool_results}
-                    )
+                    messages.append({"role": "user", "content": tool_results})
 
                 else:
-                    lf.write(
-                        f"\n=== MAX_TURNS ({MAX_TURNS}) REACHED ===\n"
-                    )
+                    lf.write(f"\n=== MAX_TURNS ({MAX_TURNS}) REACHED ===\n")
                     logger.warning(
                         "[%s/%s] agent hit MAX_TURNS=%d without finishing",
-                        state, year, MAX_TURNS,
+                        state,
+                        year,
+                        MAX_TURNS,
                     )
 
         except anthropic.APIConnectionError as e:
             logger.error("[%s/%s] API connection error: %s", state, year, e)
-            return CleanResult(
-                state=state, year=year, judge=None, error=str(e)
-            )
+            return CleanResult(state=state, year=year, judge=None, error=str(e))
         except anthropic.APIStatusError as e:
             logger.error(
                 "[%s/%s] API status %d: %s",
-                state, year, e.status_code, e.message,
+                state,
+                year,
+                e.status_code,
+                e.message,
             )
             return CleanResult(
-                state=state, year=year, judge=None,
+                state=state,
+                year=year,
+                judge=None,
                 error=f"API error {e.status_code}: {e.message}",
             )
         except anthropic.APITimeoutError as e:
             logger.error("[%s/%s] API timeout: %s", state, year, e)
             return CleanResult(
-                state=state, year=year, judge=None,
+                state=state,
+                year=year,
+                judge=None,
                 error="API request timed out",
             )
         except Exception as e:
-            logger.error(
-                "[%s/%s] unexpected error: %s", state, year, e
-            )
-            return CleanResult(
-                state=state, year=year, judge=None, error=str(e)
-            )
+            logger.error("[%s/%s] unexpected error: %s", state, year, e)
+            return CleanResult(state=state, year=year, judge=None, error=str(e))
 
         logger.info(
             "[%s/%s] tool-use loop done — full output in %s",
-            state, year, log_path,
+            state,
+            year,
+            log_path,
         )
 
-        output_dir = os.path.join(
-            self._states_root, state, year, "output"
-        )
+        output_dir = os.path.join(self._states_root, state, year, "output")
         try:
             judge = load_judge_report(output_dir)
         except FileNotFoundError as e:
             logger.error("[%s/%s] %s", state, year, e)
-            return CleanResult(
-                state=state, year=year, judge=None, error=str(e)
-            )
-        logger.info(
-            "[%s/%s] judge report: %s", state, year, judge.overall
-        )
+            return CleanResult(state=state, year=year, judge=None, error=str(e))
+        logger.info("[%s/%s] judge report: %s", state, year, judge.overall)
         return CleanResult(state=state, year=year, judge=judge)
