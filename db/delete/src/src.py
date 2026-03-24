@@ -16,13 +16,18 @@ import time
 
 import firebase_admin
 from firebase_admin import credentials, firestore
-from google.api_core.exceptions import Aborted, DeadlineExceeded, ResourceExhausted
+from google.api_core.exceptions import (
+    Aborted,
+    DeadlineExceeded,
+    ResourceExhausted,
+)
 from tenacity import (
     retry,
     retry_if_exception_type,
     stop_after_attempt,
     wait_exponential,
 )
+
 
 logging.basicConfig(
     level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s"
@@ -83,18 +88,16 @@ def delete_all(db):
 def delete_states(db, states):
     for state in states:
         prefix = f"{state.lower()}-"
-        logging.info(
-            f"[{state}] Deleting documents with prefix '{prefix}'..."
-        )
+        logging.info(f"[{state}] Deleting documents with prefix '{prefix}'...")
         total = delete_docs(
             db,
             lambda p=prefix: (
                 db.collection(COLLECTION)
                 .order_by("__name__")
-                .start_at({u"__name__": db.collection(COLLECTION).document(p)})
+                .start_at({"__name__": db.collection(COLLECTION).document(p)})
                 .end_before(
                     {
-                        u"__name__": db.collection(COLLECTION).document(
+                        "__name__": db.collection(COLLECTION).document(
                             p[:-1] + chr(ord(p[-2]) + 1) + "-"
                             if len(p) > 1
                             else p + "\uf8ff"
@@ -110,9 +113,7 @@ def delete_states_simple(db, states):
     """Delete state docs by iterating and checking prefix (simpler, works for all cases)."""
     for state in states:
         prefix = f"{state.lower()}-"
-        logging.info(
-            f"[{state}] Deleting documents with prefix '{prefix}'..."
-        )
+        logging.info(f"[{state}] Deleting documents with prefix '{prefix}'...")
         total = 0
         coll = db.collection(COLLECTION)
         last_doc = None
@@ -128,8 +129,7 @@ def delete_states_simple(db, states):
 
             to_delete = [d for d in docs if d.id.startswith(prefix)]
             past_prefix = any(
-                not d.id.startswith(prefix) and d.id >= prefix
-                for d in docs
+                not d.id.startswith(prefix) and d.id >= prefix for d in docs
             )
 
             if to_delete:
@@ -138,7 +138,9 @@ def delete_states_simple(db, states):
                     batch.delete(doc.reference)
                 _commit(batch)
                 total += len(to_delete)
-                logging.info(f"  Deleted batch of {len(to_delete)} (total: {total})")
+                logging.info(
+                    f"  Deleted batch of {len(to_delete)} (total: {total})"
+                )
 
             if past_prefix or len(docs) < BATCH_SIZE:
                 break

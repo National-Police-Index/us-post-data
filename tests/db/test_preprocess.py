@@ -1,9 +1,9 @@
 """Tests for db/preprocess/src/src.py — year-scoped path support."""
+
 import os
 import sys
 import tempfile
 
-import pytest
 
 # Make the preprocess module importable
 sys.path.insert(
