@@ -32,6 +32,24 @@ FAKE_DIRS = json.dumps(
 )
 
 
+FAKE_STATES = json.dumps(
+    [
+        {"Name": "az", "IsDir": True},
+        {"Name": "ga", "IsDir": True},
+        {"Name": "ca", "IsDir": True},
+        {"Name": "SomeFile.txt", "IsDir": False},
+    ]
+)
+
+
+def test_list_states_returns_lowercase_alpha_dirs():
+    client = RcloneClient(remote="dropbox:post-db-test", states_root="states")
+    with patch("subprocess.run") as mock_run:
+        mock_run.return_value = MagicMock(returncode=0, stdout=FAKE_STATES)
+        states = client.list_states()
+    assert states == ["az", "ga", "ca"]
+
+
 def test_list_years_returns_directory_names():
     client = RcloneClient(remote="dropbox:post-db-test", states_root="states")
     with patch("subprocess.run") as mock_run:

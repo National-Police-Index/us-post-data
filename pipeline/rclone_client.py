@@ -21,6 +21,31 @@ class RcloneClient:
     def _dest(self, state: str, year: str) -> str:
         return os.path.join(self._states_root, state, year, "data", "input")
 
+    def list_states(self) -> list[str]:
+        """Return state subdirectories at the root of the remote."""
+        path = f"{self._remote}/"
+        logger.debug("rclone lsjson %s", path)
+        proc = subprocess.run(
+            ["rclone", "lsjson", path],
+            capture_output=True,
+            text=True,
+        )
+        if proc.returncode != 0:
+            logger.error("rclone lsjson failed for root: %s", proc.stderr)
+            raise RuntimeError(
+                f"rclone lsjson failed for root: {proc.stderr}"
+            )
+        entries = json.loads(proc.stdout or "[]")
+        states = [
+            e["Name"]
+            for e in entries
+            if e.get("IsDir", False)
+            and e["Name"].islower()
+            and e["Name"].isalpha()
+        ]
+        logger.info("states on remote: %s", states)
+        return states
+
     def list_years(self, state: str) -> list[str]:
         """Return year subdirectories for a state on the remote."""
         path = f"{self._remote}/{state}/"

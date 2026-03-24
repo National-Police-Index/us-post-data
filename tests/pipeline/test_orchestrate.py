@@ -16,6 +16,17 @@ def _orch(tmp):
     )
 
 
+def test_discover_states_uses_remote():
+    with tempfile.TemporaryDirectory() as d:
+        orch = _orch(d)
+        with patch.object(
+            orch._rclone, "list_states", return_value=["az", "ga", "ca"]
+        ) as mock_list:
+            states = orch._discover_states()
+        mock_list.assert_called_once()
+        assert states == ["az", "ga", "ca"]
+
+
 def test_no_changes_makes_no_pr():
     with tempfile.TemporaryDirectory() as d:
         orch = _orch(d)
