@@ -53,7 +53,7 @@
 > - `.github/workflows/firebase-upload.yaml` — rewritten: reads registry for targets, uploads committed `.csv.gz` directly (no preprocess in CI), updates `registry.csv` (`firebase_pushed=yes`/`skipped`), commits back with `[skip ci]`.
 > - 66 tests passing (10 new: 6 in `tests/db/test_preprocess.py`, 4 in pipeline tests).
 >
-> **Remaining steps (2026-03-24):**
+> **Remaining steps (2026-03-24, updated):**
 >
 > **Completed so far:**
 > - GA end-to-end local test: WARN 21/22 checks, 480k employment + 42k discipline rows ✅
@@ -64,43 +64,24 @@
 > - firebase-upload.yaml triggered on merge → "Nothing to upload" (expected no-op) ✅
 > - `anthropic` added to requirements.txt (was missing, caused ModuleNotFoundError in CI) ✅
 > - Repo Actions permissions set to read/write (needed for bot commits) ✅
->
-> **Blocking issue:**
-> - `RCLONE_CONFIG` secret is not being parsed correctly by rclone in CI.
->   Error: `invalid character 'a' looking for beginning of object key string`
->   This means rclone is receiving a malformed config. The secret must be the
->   exact raw contents of `~/.config/rclone/rclone.conf` (TOML format, starts
->   with `[dropbox]`). Check for extra quotes, newline encoding, or truncation.
->   If the secret is correct, the workflow's `echo "${{ secrets.RCLONE_CONFIG }}"`
->   step may need to use `printf` or a heredoc to preserve newlines.
->
-> **Minor issue (non-blocking):**
-> - `_discover_states()` in orchestrator scans all lowercase alpha dirs under
->   `states/`, which includes `states/helpers/`. Fix: add a check for a known
->   marker (e.g. presence of a year subdir) or explicitly exclude `helpers`.
+> - RCLONE_CONFIG fix: switched from `echo` to `printf '%s'` via env var in dropbox-poll.yaml ✅
+> - `_discover_states()` fixed to exclude `helpers` and any dir without year subdirs ✅
+> - CI run (ca): CC agent PASS 63 turns, preprocess complete — PR creation failed (permissions) ✅
+> - GitHub Actions PR creation permissions enabled ✅
+> - `commit_outputs` fixed: error handling, logging, `--force` on git add, explicit push ✅
+> - Branch name uses timestamp to avoid same-day conflicts ✅
+> - PR body now includes full judge_report.md content per state ✅
+> - AZ end-to-end local test: CC agent WARN 27 turns, preprocess complete, PR #75 opened ✅
+>   (PR #75 has full judge report — pending merge + Firebase upload verification)
 >
 > **Remaining steps:**
-> 1. Fix RCLONE_CONFIG: verify secret value in GitHub is exact rclone.conf contents.
->    If still failing, change the workflow write step to:
->    ```yaml
->    - name: Configure rclone
->      run: |
->        mkdir -p ~/.config/rclone
->        printf '%s' "${{ secrets.RCLONE_CONFIG }}" > ~/.config/rclone/rclone.conf
->    ```
-> 2. Fix `_discover_states()` to exclude `helpers` dir (minor, but causes noisy errors).
-> 3. Re-trigger `dropbox-poll.yaml` via workflow_dispatch → pipeline should:
->    - rclone copy GA + CA from `dropbox:post-db-test`
->    - Run CleanRunner (clean.py already in repo — no CC agent needed)
->    - Preprocess → `.csv.gz` files
->    - Commit outputs + open a data PR
-> 4. Review and merge the data PR.
-> 5. firebase-upload.yaml auto-triggers → uploads 1,000 docs per file to post-test-auto.
-> 6. Verify ~3,000 docs in Firestore `db_launch` collection.
-> 7. Cleanup for production:
+> 1. Merge PR #75 (AZ) → firebase-upload.yaml auto-triggers → verify AZ docs in Firestore db_launch ✅
+> 2. Verify Firebase upload succeeded (check post-test-auto Firestore).
+> 3. Cleanup for production:
 >    - Remove `--limit 1000` from firebase-upload.yaml and db/upload/src/src.py
 >    - Revert cron from `0 * * * *` to `0 6 * * *` in dropbox-poll.yaml
 >    - Update `RCLONE_REMOTE` secret from `dropbox:post-db-test` → `dropbox:national-post-db`
+>    - Restructure production Dropbox remote to year-based paths (e.g. `az/2025/input/`)
 
 **Goal:** Poll Dropbox for new POST data using rclone, detect changes per `(state, year)` pair, run cleaning pipelines (using Claude Code for new state+year combos), open a GitHub PR, and trigger a Firebase upload on merge (latest year only per state).
 
