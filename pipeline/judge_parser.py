@@ -43,7 +43,11 @@ def load_judge_report(output_dir: str) -> JudgeResult:
 
     if os.path.exists(json_path):
         with open(json_path) as f:
-            return parse_judge_report(f.read())
+            result = parse_judge_report(f.read())
+        if os.path.exists(md_path):
+            with open(md_path) as f:
+                result.raw = f.read()
+        return result
     if os.path.exists(md_path):
         with open(md_path) as f:
             return parse_judge_report(f.read())
