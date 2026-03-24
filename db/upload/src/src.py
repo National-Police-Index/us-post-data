@@ -103,7 +103,9 @@ def delete_state_data(db, prefix):
     print(f"  Deleted {deleted} documents")
 
 
-def upload_file(file_path, prefix, force=False, batch_size=1000, dry_run=False, limit=None):
+def upload_file(
+    file_path, prefix, force=False, batch_size=1000, dry_run=False, limit=None
+):
     from google.api_core.exceptions import DeadlineExceeded, ResourceExhausted
     from tenacity import (
         retry,

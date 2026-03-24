@@ -103,7 +103,9 @@ class LLM:
             return content
         except Exception as e:
             logger.error(f"Azure OpenAI API error: {e}")
-            raise RuntimeError(f"Failed to get response from Azure OpenAI: {e}")
+            raise RuntimeError(
+                f"Failed to get response from Azure OpenAI: {e}"
+            ) from e
 
     def run_inference(
         self, prompt, model=None, max_tokens=4096, temperature=0.1
@@ -136,7 +138,7 @@ class LLM:
         # Cache key
         serialized = json.dumps(messages, sort_keys=True)
         hash_value = blake3.blake3(serialized.encode()).hexdigest()
-        cache_key = f"llm_response-{model_to_use}:{hash_value}"
+        _ = f"llm_response-{model_to_use}:{hash_value}"
 
         @retry(
             stop=stop_after_attempt(5),
@@ -158,7 +160,7 @@ class LLM:
             return result
         except Exception as e:
             logger.error(f"Structured inference error: {e}")
-            raise ValueError(f"Model returned invalid response: {e}")
+            raise ValueError(f"Model returned invalid response: {e}") from e
 
     def _clean_schema_response(self, parsed_data: dict) -> dict:
         """
