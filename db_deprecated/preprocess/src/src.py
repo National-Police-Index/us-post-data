@@ -1,14 +1,3 @@
-"""
-Preprocess cleaned state index CSVs for Firebase upload.
-
-Reads from automated_processing/data/output/<STATE>/
-Writes compressed .csv.gz to db/data/output/<STATE>/
-
-Handles both employment and discipline index files:
-  <state>_index.csv              → <state>-processed.csv.gz
-  <state>-discipline_index.csv   → <state>-discipline-processed.csv.gz
-"""
-
 import argparse
 import datetime
 import gzip
@@ -16,6 +5,9 @@ import os
 
 import numpy as np
 import pandas as pd
+
+
+# dates aren't normalized??
 
 
 def case_cols(df):
@@ -35,9 +27,14 @@ def case_cols(df):
         "middle_name",
         "suffix",
     ]
+
     for col in columns_to_transform:
         if col in df.columns:
             df[col] = df[col].fillna("").astype(str).str.lower().str.strip()
+        else:
+            print(
+                f"Column '{col}' not found. Skipping transformation for this column."
+            )
     return df
 
 
@@ -74,11 +71,15 @@ def clean_agency_names(df):
 
 def apply_proper_casing(df):
     def proper_case(text):
+        # Split the text into words
         words = text.split()
+        # Process each word
         processed_words = []
         for word in words:
+            # Special handling for Sheriff's
             if word.lower() == "sheriff's":
                 processed_words.append("Sheriff's")
+            # Special handling for suffixes and roman numerals
             elif word.upper() in [
                 "I",
                 "II",
@@ -97,8 +98,10 @@ def apply_proper_casing(df):
                     processed_words.append(word.capitalize())
                 else:
                     processed_words.append(word.upper())
+            # Special handling for abbreviations like 'PD' for Police Department
             elif word.upper() in ["PD", "SO", "DA", "UC"]:
                 processed_words.append(word.upper())
+            # General case: capitalize first letter, lowercase the rest
             else:
                 processed_words.append(word.capitalize())
         return " ".join(processed_words)
@@ -115,11 +118,17 @@ def apply_proper_casing(df):
         "sex",
         "suffix",
     ]
+
     for col in columns_to_transform:
         if col in df.columns:
             df[col] = df[col].apply(
                 lambda x: proper_case(str(x)) if pd.notna(x) else x
             )
+        else:
+            print(
+                f"Column '{col}' not found. Skipping proper casing for this column."
+            )
+
     return df
 
 
@@ -131,10 +140,13 @@ def check_required_columns(df):
         "start_date",
         "end_date",
     ]
-    missing = [col for col in required_columns if col not in df.columns]
-    if missing:
-        raise ValueError(f"Missing required columns: {', '.join(missing)}")
-    return df
+    missing_columns = [col for col in required_columns if col not in df.columns]
+    if missing_columns:
+        raise ValueError(
+            f"No df returned. Missing required columns: {', '.join(missing_columns)}"
+        )
+    else:
+        return df
 
 
 def check_empty_values(df):
@@ -146,26 +158,8 @@ def check_empty_values(df):
         "end_date",
     ]
     for col in required_columns:
-        empty = df[col].isnull() | (df[col] == "")
-        if empty.any():
-            print(
-                f"  Warning: '{col}' has {empty.sum()} empty values "
-                f"({empty.mean():.1%})"
-            )
-    return df
-
-
-def filter_anons(df):
-    if "last_name" not in df.columns:
-        return df
-    return df.loc[
-        ~df.last_name.str.lower().str.contains("withheld", na=False)
-    ].copy()
-
-
-def sort_by_uid(df):
-    if "person_nbr" in df.columns:
-        df = df.sort_values("person_nbr")
+        if df[col].isnull().any() or (df[col] == "").any():
+            print(f"Warning: Column '{col}' contains empty values or NaNs")
     return df
 
 
@@ -235,10 +229,23 @@ def collapse_contiguous_stints(
     return out.drop(["stint_id"], axis=1, inplace=False)
 
 
-def apply_transformations(df):
-    return (
-        df.pipe(clean_column_names)
-        .pipe(case_cols)
+def filter_anons(df: pd.DataFrame) -> pd.DataFrame:
+    if "last_name" not in df.columns:
+        return df
+    return df.loc[~df.last_name.str.lower().str.contains("withheld")].copy()
+
+
+def sort_by_uid(df):
+    if "person_nbr" in df.columns:
+        df = df.sort_values("person_nbr")
+    return df
+
+
+def apply_transformations(df, state_name):
+    """Apply transformations based on state and available columns"""
+    df = (
+        df.pipe(case_cols)
+        .pipe(clean_column_names)
         .pipe(clean_dates)
         .pipe(clean_agency_names)
         .pipe(check_empty_values)
@@ -248,163 +255,122 @@ def apply_transformations(df):
         .pipe(sort_by_uid)
     )
 
+    # Only apply collapse_contiguous_stints for California
+    if state_name.lower() == "california":
+        df = df.pipe(collapse_contiguous_stints)
 
-def process_file(input_path, output_path, state_name, force=False):
-    """Preprocess a single index CSV and write a compressed .csv.gz."""
-    if os.path.exists(output_path) and not force:
-        print(f"  Skipping (already exists): {os.path.basename(output_path)}")
+    return df
+
+
+def process_state_data(state_name, input_dir, output_dir, force=False):
+    """
+    Process state data and prepare it for Firestore upload with optimized document IDs
+    """
+    # Create state-specific output directory
+    state_output_dir = os.path.join(output_dir, state_name)
+    os.makedirs(state_output_dir, exist_ok=True)
+
+    input_file_path = os.path.join(
+        input_dir, state_name, f"{state_name}_index.csv"
+    )
+    output_file_path = os.path.join(
+        state_output_dir, f"{state_name}-processed.csv.gz"
+    )
+
+    # Check if output file already exists
+    if os.path.exists(output_file_path) and not force:
+        print(f"Skipping {state_name} - output file already exists")
         return "skipped"
 
     try:
-        df = pd.read_csv(input_path, low_memory=False)
-        print(f"  Read {len(df):,} rows from {os.path.basename(input_path)}")
+        df = pd.read_csv(input_file_path)
+        df = apply_transformations(df, state_name)
 
-        df = apply_transformations(df)
-
-        # Attach state and document_id
+        # Add state field - using simple string replace
         formatted_state = state_name.lower().replace(" ", "-")
         df["state"] = formatted_state
+
+        # Ensure person_nbr is string and pad with zeros
         df["person_nbr"] = df["person_nbr"].astype(str)
+
+        # Create document_id field
         df["document_id"] = df["state"] + "_" + df["person_nbr"]
 
-        os.makedirs(os.path.dirname(output_path), exist_ok=True)
-        with gzip.open(output_path, "wt", encoding="utf-8") as gz_file:
+        # Ensure output directory exists
+        os.makedirs(os.path.dirname(output_file_path), exist_ok=True)
+
+        with gzip.open(output_file_path, "wt", encoding="utf-8") as gz_file:
             df.to_csv(gz_file, index=False)
 
-        print(f"  Written {len(df):,} rows → {os.path.basename(output_path)}")
+        print(f"Successfully processed {state_name}")
         return "success"
     except Exception as e:
-        print(f"  Error: {e}")
+        print(f"Error processing {state_name}: {str(e)}")
         return "failed"
 
 
-def find_index_files(input_dir, state_name, year):
-    """
-    Return a list of (input_path, output_filename) tuples for all index CSVs
-    found in states/<STATE>/<YEAR>/output/.
-
-    Scans for any *_index.csv files rather than predicting names, so it works
-    regardless of whether the file uses the abbreviation (ga_index.csv) or the
-    full name (georgia_index.csv).
-
-      <stem>_index.csv  →  <stem>-processed.csv.gz
-
-    Output is written to db/data/output/<state>/ (no year — always latest).
-    """
-    output_dir = os.path.join(input_dir, state_name, year, "output")
-    if not os.path.isdir(output_dir):
-        return []
-
-    found = []
-    for fname in sorted(os.listdir(output_dir)):
-        if not fname.endswith("_index.csv"):
-            continue
-        src_path = os.path.join(output_dir, fname)
-        # georgia_index.csv            → georgia-processed.csv.gz
-        # georgia-discipline_index.csv → georgia-discipline-processed.csv.gz
-        stem = fname.replace("_index.csv", "")
-        dst_name = f"{stem}-processed.csv.gz"
-        found.append((src_path, dst_name))
-    return found
-
-
 def main():
-    parser = argparse.ArgumentParser(
-        description="Preprocess cleaned state index CSVs for Firebase upload"
-    )
+    parser = argparse.ArgumentParser(description="Process state data files")
     parser.add_argument(
         "--input-dir",
-        default="../../states",
-        help=(
-            "Root states/ directory — expects "
-            "states/<STATE>/data/output/<state>_index.csv "
-            "(default: ../../states)"
-        ),
+        type=str,
+        required=True,
+        help="Input directory containing state subdirectories",
     )
     parser.add_argument(
         "--output-dir",
-        default="../data/output",
-        help="Output directory for processed .csv.gz files (default: ../data/output)",
-    )
-    parser.add_argument(
-        "--states",
-        nargs="+",
-        help="Process only these states (default: all states found in input-dir)",
-    )
-    parser.add_argument(
-        "--year",
-        help=(
-            "Year subdirectory to read from (e.g. 2025). "
-            "Required when --states is used. "
-            "Reads from states/<STATE>/<YEAR>/output/."
-        ),
+        type=str,
+        required=True,
+        help="Output directory for processed files",
     )
     parser.add_argument(
         "--force",
         action="store_true",
-        help="Reprocess even if output already exists",
+        help="Force reprocessing of files even if output exists",
     )
     args = parser.parse_args()
 
-    if args.states and not args.year:
-        parser.error("--year is required when --states is specified")
-
     if not os.path.exists(args.input_dir):
-        raise ValueError(f"Input directory not found: {args.input_dir}")
+        raise ValueError(f"Input directory does not exist: {args.input_dir}")
     os.makedirs(args.output_dir, exist_ok=True)
 
-    # Determine which states to process
-    if args.states:
-        state_dirs = args.states
-    else:
-        state_dirs = [
-            d
-            for d in os.listdir(args.input_dir)
-            if os.path.isdir(os.path.join(args.input_dir, d))
-        ]
+    successful_states = []
+    failed_states = []
+    skipped_states = []
 
-    if not state_dirs:
-        print(f"No state directories found in {args.input_dir}")
-        return
+    state_dirs = [
+        d
+        for d in os.listdir(args.input_dir)
+        if os.path.isdir(os.path.join(args.input_dir, d))
+    ]
 
-    print(f"Processing {len(state_dirs)} state(s): {', '.join(state_dirs)}\n")
-
-    results = {"success": [], "skipped": [], "failed": []}
+    print(f"Found {len(state_dirs)} state directories to process")
 
     for state in state_dirs:
-        print(f"[{state}]")
-        files = find_index_files(args.input_dir, state, args.year)
+        result = process_state_data(
+            state, args.input_dir, args.output_dir, args.force
+        )
+        if result == "success":
+            successful_states.append(state)
+        elif result == "skipped":
+            skipped_states.append(state)
+        else:  # result == "failed"
+            failed_states.append(state)
 
-        if not files:
-            print("  No index CSVs found — skipping")
-            results["skipped"].append(state)
-            continue
+    print("\nProcessing complete!")
+    print(f"Successfully processed: {len(successful_states)} states")
+    print(f"Skipped (already processed): {len(skipped_states)} states")
+    print(f"Errors encountered: {len(failed_states)} states")
 
-        state_output_dir = os.path.join(args.output_dir, state)
+    if skipped_states:
+        print("\nStates skipped (use --force to reprocess):")
+        for state in skipped_states:
+            print(f"  - {state}")
 
-        for input_path, output_name in files:
-            output_path = os.path.join(state_output_dir, output_name)
-            status = process_file(
-                input_path, output_path, state, force=args.force
-            )
-            if status == "success":
-                results["success"].append(f"{state}/{output_name}")
-            elif status == "skipped":
-                results["skipped"].append(f"{state}/{output_name}")
-            else:
-                results["failed"].append(f"{state}/{output_name}")
-        print()
-
-    print("=" * 50)
-    print(
-        f"Done. Success: {len(results['success'])}  "
-        f"Skipped: {len(results['skipped'])}  "
-        f"Failed: {len(results['failed'])}"
-    )
-    if results["failed"]:
-        print("Failed:")
-        for f in results["failed"]:
-            print(f"  - {f}")
+    if failed_states:
+        print("\nStates that failed processing:")
+        for state in failed_states:
+            print(f"  - {state}")
 
 
 if __name__ == "__main__":

@@ -9,10 +9,29 @@ archive/
 normalized-archive/
 *.tsx
 *.json
+
+# pipeline/data/ is tracked (manifest, registry, groundtruth reference)
+!pipeline/data/
+!pipeline/data/.gitkeep
+!pipeline/data/registry.csv
+!pipeline/data/manifest.json
+!pipeline/data/groundtruth.md
+
 preprocess/download
 entity-resolution/
 input
 output
+
+# db/data/output/ is tracked (.csv.gz preprocessed files for Firebase upload)
+!db/data/
+!db/data/output/
+!db/data/output/**
+
+# Secrets
+**/.env
+
+# LLM response cache
+llm-responses.cache/
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

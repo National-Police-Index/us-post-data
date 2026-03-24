@@ -5,6 +5,7 @@ description = "This repository contains scripts and notebooks for exploratory an
 readme = "README.md"
 requires-python = ">=3.10"
 dependencies = [
+    "anthropic>=0.46.0",
     "bs4>=0.0.2",
     "firebase-admin>=6.7.0",
     "fuzzywuzzy>=0.18.0",

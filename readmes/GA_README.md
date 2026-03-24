@@ -60,19 +60,4 @@ It's important to note that while both datasets were nearly analogous, there was
 
 ## Output
 
-The script generates four CSV files:
-
-1. `ga-2024-original-leo.csv`: Contains the original certification data with cleaned column names for law enforcement officers and corrections officers as provided by the state.
-
-2. `ga-2024-original-leo-demographics.csv`: Contains the original demographic data with cleaned column names for law enforcement officers and corrections officers as provided by the state.
-
-3. `ga-2024-index.csv`: Contains a standardized index for both law enforcement and corrections officers. Each officer can be associated with a single department multiple times within one employment stint. Common reasons for being associated with a single department more than once include changes in rank.
-
-4. `ga-2024-enhanced-work-history.csv`: Contains all the columns from the index file, with the addition of status and change_reason. This allows you to see the reasons an officer separated from an agency, including retirement, resignation, termination, etc.
-
-## Additional information
-The input directory contains `ga-2024-reciprocity.csv`. This table contains information on officers who joined the Georgia POST agency after being affiliated with a POST agency in a different state.
-
-## Questions or suggestions for improvement?
-
-Processing by Ayyub Ibrahim, Louisiana Law Enforcement Accountability Database ayyubi@ip-no.org
+1. `ga-2024-enhanced-work-history.csv`: Contains all the columns from the index file, with the addition of status and change_reason. This allows you to see the reasons an officer separated from an agency, including retirement, resignation, termination, etc.

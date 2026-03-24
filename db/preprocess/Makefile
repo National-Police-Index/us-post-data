@@ -1,19 +1,21 @@
-INPUT_DIR := ../download/data/output
-OUTPUT_DIR := data/output
+INPUT_DIR  := ../../states
+OUTPUT_DIR := ../data/output
 
-.PHONY: run
+STATE :=
+YEAR  :=
+
+.PHONY: run run-force clean setup
+
 run:
-	python3 src/src.py --input-dir $(INPUT_DIR) --output-dir $(OUTPUT_DIR)
+	python3 src/src.py --input-dir $(INPUT_DIR) --output-dir $(OUTPUT_DIR) \
+		$(if $(STATE),--states $(STATE)) $(if $(YEAR),--year $(YEAR))
 
-# Force reprocessing of all files
-.PHONY: run-force
 run-force:
-	python3 src/src.py --input-dir $(INPUT_DIR) --output-dir $(OUTPUT_DIR) --force
+	python3 src/src.py --input-dir $(INPUT_DIR) --output-dir $(OUTPUT_DIR) --force \
+		$(if $(STATE),--states $(STATE)) $(if $(YEAR),--year $(YEAR))
 
-.PHONY: clean
 clean:
 	rm -rf $(OUTPUT_DIR)/*/*.csv.gz
 
-.PHONY: setup
 setup:
 	mkdir -p $(INPUT_DIR) $(OUTPUT_DIR)
