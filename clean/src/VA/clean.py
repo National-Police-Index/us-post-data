@@ -104,8 +104,8 @@ output_columns = [
 ]
 output_df = df_merged[output_columns]
 
-# drop duplicates
-keys = ['full_name', 'first_name', 'last_name', 'start_date', 'agency_name', 'end_date']
+# Drop duplicates
+keys = ['person_nbr', 'full_name', 'agency_name', 'start_date', 'end_date', 'offense', 'separation_reason']
 output_df.drop_duplicates(subset =keys, inplace=True)
 
 save_path = "processed_output/va_index.csv"
