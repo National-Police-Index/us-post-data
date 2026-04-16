@@ -42,10 +42,7 @@ df_merged["first_name"] = (
     df_merged["first_name"].str.replace(".", "", regex=False).str.upper()
 )
 df_merged["last_name"] = (
-    df_merged["last_name"]
-    .astype(str)
-    .str.replace(".", "", regex=False)
-    .str.upper()
+    df_merged["last_name"].astype(str).str.replace(".", "", regex=False).str.upper()
 )
 df_merged["full_name"] = df_merged["first_name"] + " " + df_merged["last_name"]
 df_merged["agency_name"] = (
@@ -73,9 +70,7 @@ df_merged["separation_reason"][df_merged["DecertifiedByDCJS"] == "Yes"] = (
 
 # Fix formatting of rank titles (expand abbreviations).
 # Appreviation map is based on most frequent abbreviations seen in this dataset
-df_merged["rank"] = (
-    df_merged["rank"].str.replace(".", "", regex=False).str.upper()
-)
+df_merged["rank"] = df_merged["rank"].str.replace(".", "", regex=False).str.upper()
 abbr_map = {
     "ASST": "ASSISTANT",
     "SPEC": "SPECIAL",
@@ -83,9 +78,7 @@ abbr_map = {
     "SR": "SENIOR",
 }
 
-pattern = re.compile(
-    r"\b(" + "|".join(re.escape(k) for k in abbr_map.keys()) + r")\b"
-)
+pattern = re.compile(r"\b(" + "|".join(re.escape(k) for k in abbr_map.keys()) + r")\b")
 df_merged["rank"] = df_merged["rank"].apply(expand_abbreviations)
 
 # 4) Select and order columns according to schema
@@ -105,8 +98,16 @@ output_columns = [
 output_df = df_merged[output_columns]
 
 # Drop duplicates
-keys = ['person_nbr', 'full_name', 'agency_name', 'start_date', 'end_date', 'offense', 'separation_reason']
-output_df.drop_duplicates(subset =keys, inplace=True)
+keys = [
+    "person_nbr",
+    "full_name",
+    "agency_name",
+    "start_date",
+    "end_date",
+    "offense",
+    "separation_reason",
+]
+output_df.drop_duplicates(subset=keys, inplace=True)
 
 save_path = "processed_output/va_index.csv"
 os.makedirs(os.path.dirname(save_path), exist_ok=True)
