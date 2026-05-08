@@ -150,6 +150,15 @@ raw data preserved in Dropbox for future runs.
    Flip the last column to `yes` after a successful Firebase upload.
 7. **Upload to Firebase** when ready: `cd db && make upload STATE=<state>`.
 
+8. **Run the front-end pipeline** (from the front-end repo, in order):
+   ```bash
+   npx tsx scripts/normalizeStateData.ts <full-state>
+   npx tsx scripts/normalizeDatesByState.ts <full-state>
+   npx tsx scripts/addSearchQueriesByState.ts <full-state>
+   npx tsx scripts/generateStateStats.ts <full-state>
+   npx tsx scripts/generateAgencyStats.ts <full-state>
+   ```
+
 ## Complete Workflow
 
 ### 1. Clean New State Data
@@ -167,7 +176,14 @@ Navigate to the `db/` directory and run the three-stage process:
 - **Upload:** Upload to the production database
 
 ### 3. Front-end Deployment
-Switch to the front-end repository ([github.com/National-Police-Index](https://github.com/National-Police-Index)) and run state-specific deployment commands.
+Switch to the front-end repository ([github.com/National-Police-Index](https://github.com/National-Police-Index)) and run, in order:
+```bash
+npx tsx scripts/normalizeStateData.ts <full-state>
+npx tsx scripts/normalizeDatesByState.ts <full-state>
+npx tsx scripts/addSearchQueriesByState.ts <full-state>
+npx tsx scripts/generateStateStats.ts <full-state>
+npx tsx scripts/generateAgencyStats.ts <full-state>
+```
 
 ## Data Schema
 
