@@ -39,6 +39,59 @@ def pct(a, b):
 
 
 # ---------------------------------------------------------------------------
+# Report writer (defined early so failure paths can call it)
+# ---------------------------------------------------------------------------
+def _write_report(checks, has_gt):
+    os.makedirs(OUTPUT_DIR, exist_ok=True)
+
+    statuses = [c["status"] for c in checks]
+    if "FAIL" in statuses:
+        overall = "FAIL"
+    elif "WARN" in statuses:
+        overall = "WARN"
+    else:
+        overall = "PASS"
+
+    # Markdown
+    lines = [
+        "# Georgia POST 2025 — Judge Report",
+        "",
+        f"**Overall: {overall}**",
+        f"**Ground truth available: {has_gt}**",
+        "",
+        "| # | Check | Status | Detail |",
+        "|---|-------|--------|--------|",
+    ]
+    for i, c in enumerate(checks, 1):
+        icon = {"PASS": "✅", "WARN": "⚠️", "FAIL": "❌"}[c["status"]]
+        lines.append(
+            f"| {i} | {c['name']} | {icon} {c['status']} | {c['detail']} |"
+        )
+
+    lines += [
+        "",
+        "## Summary",
+        f"- Total checks: {len(checks)}",
+        f"- PASS: {statuses.count('PASS')}",
+        f"- WARN: {statuses.count('WARN')}",
+        f"- FAIL: {statuses.count('FAIL')}",
+    ]
+
+    md_path = os.path.join(OUTPUT_DIR, "judge_report.md")
+    with open(md_path, "w") as f:
+        f.write("\n".join(lines) + "\n")
+
+    # JSON
+    json_path = os.path.join(OUTPUT_DIR, "judge_report.json")
+    with open(json_path, "w") as f:
+        json.dump({"overall": overall, "has_groundtruth": has_gt}, f, indent=2)
+
+    print(f"\nOverall result: {overall}")
+    print(f"Reports written to {md_path} and {json_path}")
+    return overall
+
+
+# ---------------------------------------------------------------------------
 # Load output files
 # ---------------------------------------------------------------------------
 try:
@@ -412,57 +465,5 @@ else:
 # ---------------------------------------------------------------------------
 # Write reports
 # ---------------------------------------------------------------------------
-
-
-def _write_report(checks, has_gt):
-    os.makedirs(OUTPUT_DIR, exist_ok=True)
-
-    statuses = [c["status"] for c in checks]
-    if "FAIL" in statuses:
-        overall = "FAIL"
-    elif "WARN" in statuses:
-        overall = "WARN"
-    else:
-        overall = "PASS"
-
-    # Markdown
-    lines = [
-        "# Georgia POST 2025 — Judge Report",
-        "",
-        f"**Overall: {overall}**",
-        f"**Ground truth available: {has_gt}**",
-        "",
-        "| # | Check | Status | Detail |",
-        "|---|-------|--------|--------|",
-    ]
-    for i, c in enumerate(checks, 1):
-        icon = {"PASS": "✅", "WARN": "⚠️", "FAIL": "❌"}[c["status"]]
-        lines.append(
-            f"| {i} | {c['name']} | {icon} {c['status']} | {c['detail']} |"
-        )
-
-    lines += [
-        "",
-        "## Summary",
-        f"- Total checks: {len(checks)}",
-        f"- PASS: {statuses.count('PASS')}",
-        f"- WARN: {statuses.count('WARN')}",
-        f"- FAIL: {statuses.count('FAIL')}",
-    ]
-
-    md_path = os.path.join(OUTPUT_DIR, "judge_report.md")
-    with open(md_path, "w") as f:
-        f.write("\n".join(lines) + "\n")
-
-    # JSON
-    json_path = os.path.join(OUTPUT_DIR, "judge_report.json")
-    with open(json_path, "w") as f:
-        json.dump({"overall": overall, "has_groundtruth": has_gt}, f, indent=2)
-
-    print(f"\nOverall result: {overall}")
-    print(f"Reports written to {md_path} and {json_path}")
-    return overall
-
-
 overall = _write_report(checks, has_groundtruth)
 sys.exit(0 if overall in ("PASS", "WARN") else 1)
