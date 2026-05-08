@@ -15,6 +15,7 @@ import re
 import pandas as pd
 from nameparser import HumanName
 
+
 # ---------------------------------------------------------------------------
 # CLI
 # ---------------------------------------------------------------------------
@@ -31,6 +32,7 @@ os.makedirs(OUTPUT_DIR, exist_ok=True)
 # Helpers
 # ---------------------------------------------------------------------------
 
+
 def safe_date(val):
     """Return YYYY-MM-DD string or empty string for invalid/missing dates."""
     s = str(val).strip()
@@ -44,23 +46,24 @@ def safe_date(val):
     except Exception:
         return ""
 
+
 # ---------------------------------------------------------------------------
 # Separation code → human-readable reason (derived from groundtruth)
 # ---------------------------------------------------------------------------
 SEPARATION_CODE_MAP = {
-    "1":  "Resigned",
-    "2":  "Discharged",
-    "3":  "Retired",
-    "4":  "Deceased",
-    "5":  "Felony",
-    "6":  "Other",
-    "7":  "Promotion/Demotion",
-    "8":  "Involuntary Separation",
-    "9":  "Separated Pending Complaint, Administrative Charge, or Investigation for Serious Misconduct",
+    "1": "Resigned",
+    "2": "Discharged",
+    "3": "Retired",
+    "4": "Deceased",
+    "5": "Felony",
+    "6": "Other",
+    "7": "Promotion/Demotion",
+    "8": "Involuntary Separation",
+    "9": "Separated Pending Complaint, Administrative Charge, or Investigation for Serious Misconduct",
     "10": "Status Change",
     "11": "Did Not Complete Probation",
-    "Z":  "Unknown",
-    "":   "Other",
+    "Z": "Unknown",
+    "": "Other",
 }
 
 # ---------------------------------------------------------------------------
@@ -587,16 +590,16 @@ def clean_leo_agency(raw_name):
     # Fallback rule-based expansions
     s_up = key
     # Expand common abbreviations
-    s_up = re.sub(r'\bPD\b', 'POLICE DEPARTMENT', s_up)
-    s_up = re.sub(r'\bSO\b', "SHERIFF'S OFFICE", s_up)
-    s_up = re.sub(r'\bSD\b', "SHERIFF'S DEPARTMENT", s_up)
-    s_up = re.sub(r'\bDPS\b', 'DEPARTMENT OF PUBLIC SAFETY', s_up)
-    s_up = re.sub(r'\bDA\b', 'DISTRICT ATTORNEY', s_up)
-    s_up = re.sub(r'\bCO\b', 'COUNTY', s_up)
-    s_up = re.sub(r'\bCA\b', 'CALIFORNIA', s_up)
-    s_up = re.sub(r'\bDEPT\b', 'DEPARTMENT', s_up)
-    s_up = re.sub(r'\bSVCS?\b', 'SERVICES', s_up)
-    s_up = re.sub(r'\s+', ' ', s_up).strip()
+    s_up = re.sub(r"\bPD\b", "POLICE DEPARTMENT", s_up)
+    s_up = re.sub(r"\bSO\b", "SHERIFF'S OFFICE", s_up)
+    s_up = re.sub(r"\bSD\b", "SHERIFF'S DEPARTMENT", s_up)
+    s_up = re.sub(r"\bDPS\b", "DEPARTMENT OF PUBLIC SAFETY", s_up)
+    s_up = re.sub(r"\bDA\b", "DISTRICT ATTORNEY", s_up)
+    s_up = re.sub(r"\bCO\b", "COUNTY", s_up)
+    s_up = re.sub(r"\bCA\b", "CALIFORNIA", s_up)
+    s_up = re.sub(r"\bDEPT\b", "DEPARTMENT", s_up)
+    s_up = re.sub(r"\bSVCS?\b", "SERVICES", s_up)
+    s_up = re.sub(r"\s+", " ", s_up).strip()
     return s_up
 
 
@@ -618,10 +621,15 @@ leo_raw.columns = [c.strip() for c in leo_raw.columns]
 leo_raw["person_nbr"] = leo_raw["POST_ID"].astype(str).str.strip().str.lower()
 
 # Drop rows with no person_nbr
-leo_raw = leo_raw[leo_raw["person_nbr"].notna() & (leo_raw["person_nbr"] != "") & (leo_raw["person_nbr"] != "nan")]
+leo_raw = leo_raw[
+    leo_raw["person_nbr"].notna()
+    & (leo_raw["person_nbr"] != "")
+    & (leo_raw["person_nbr"] != "nan")
+]
 
 # Parse names using nameparser — only parse unique names for speed
 print("Parsing LEO names...")
+
 
 def parse_leo_name(name_str):
     s = str(name_str).strip() if pd.notna(name_str) else ""
@@ -634,6 +642,7 @@ def parse_leo_name(name_str):
         n.last.upper() if n.last else "",
         n.suffix.upper() if n.suffix else "",
     )
+
 
 unique_names = leo_raw["officer_name"].fillna("").unique()
 name_cache = {nm: parse_leo_name(nm) for nm in unique_names}
@@ -661,20 +670,24 @@ leo_raw = leo_raw[leo_raw["start_date"] != ""]
 # Agency names — use dict lookup for speed, fallback for unmapped
 print("Cleaning LEO agency names...")
 agency_key = leo_raw["agency"].astype(str).str.strip().str.upper()
+
+
 # Build fallback for unmapped agencies using rule-based expansion
 def fallback_agency(key):
     import re
+
     s = key
-    s = re.sub(r'\bPD\b', 'POLICE DEPARTMENT', s)
-    s = re.sub(r'\bSO\b', "SHERIFF'S OFFICE", s)
-    s = re.sub(r'\bSD\b', "SHERIFF'S DEPARTMENT", s)
-    s = re.sub(r'\bDPS\b', 'DEPARTMENT OF PUBLIC SAFETY', s)
-    s = re.sub(r'\bDA\b', 'DISTRICT ATTORNEY', s)
-    s = re.sub(r'\bCO\b', 'COUNTY', s)
-    s = re.sub(r'\bCA\b', 'CALIFORNIA', s)
-    s = re.sub(r'\bDEPT\b', 'DEPARTMENT', s)
-    s = re.sub(r'\bSVCS?\b', 'SERVICES', s)
-    return re.sub(r'\s+', ' ', s).strip()
+    s = re.sub(r"\bPD\b", "POLICE DEPARTMENT", s)
+    s = re.sub(r"\bSO\b", "SHERIFF'S OFFICE", s)
+    s = re.sub(r"\bSD\b", "SHERIFF'S DEPARTMENT", s)
+    s = re.sub(r"\bDPS\b", "DEPARTMENT OF PUBLIC SAFETY", s)
+    s = re.sub(r"\bDA\b", "DISTRICT ATTORNEY", s)
+    s = re.sub(r"\bCO\b", "COUNTY", s)
+    s = re.sub(r"\bCA\b", "CALIFORNIA", s)
+    s = re.sub(r"\bDEPT\b", "DEPARTMENT", s)
+    s = re.sub(r"\bSVCS?\b", "SERVICES", s)
+    return re.sub(r"\s+", " ", s).strip()
+
 
 # Build full lookup including fallbacks for all unique values
 unique_agencies = agency_key.unique()
@@ -689,29 +702,52 @@ for k in unique_agencies:
 leo_raw["agency_name"] = agency_key.map(agency_resolved)
 
 # separation_reason from separation_code
-leo_raw["separation_code_str"] = leo_raw["separation_code"].astype(str).str.strip()
-leo_raw["separation_reason"] = leo_raw["separation_code_str"].map(SEPARATION_CODE_MAP).fillna("")
+leo_raw["separation_code_str"] = (
+    leo_raw["separation_code"].astype(str).str.strip()
+)
+leo_raw["separation_reason"] = (
+    leo_raw["separation_code_str"].map(SEPARATION_CODE_MAP).fillna("")
+)
 
 # rank - keep as-is (uppercase already in source)
 leo_raw["rank"] = leo_raw["rank"].astype(str).str.strip().str.upper()
 leo_raw.loc[leo_raw["rank"] == "NAN", "rank"] = ""
 
 # full_name
-leo_raw["full_name"] = leo_raw["officer_name"].astype(str).str.strip().str.upper()
+leo_raw["full_name"] = (
+    leo_raw["officer_name"].astype(str).str.strip().str.upper()
+)
 
 # type
 leo_raw["type"] = "POLICE"
 
 # Select and order columns for LEO
 leo_cols = [
-    "person_nbr", "first_name", "middle_name", "last_name", "suffix",
-    "full_name", "agency_name", "start_date", "end_date",
-    "rank", "separation_reason", "type",
+    "person_nbr",
+    "first_name",
+    "middle_name",
+    "last_name",
+    "suffix",
+    "full_name",
+    "agency_name",
+    "start_date",
+    "end_date",
+    "rank",
+    "separation_reason",
+    "type",
 ]
 leo_df = leo_raw[leo_cols].copy()
 
 # Filter out non-agency strings
-NON_AGENCY = {"", "nan", "application denied", "application purged", "pending", "unknown", "n/a"}
+NON_AGENCY = {
+    "",
+    "nan",
+    "application denied",
+    "application purged",
+    "pending",
+    "unknown",
+    "n/a",
+}
 leo_df = leo_df[~leo_df["agency_name"].str.strip().str.lower().isin(NON_AGENCY)]
 
 print(f"LEO rows after cleaning: {len(leo_df)}")
@@ -720,7 +756,9 @@ print(f"LEO rows after cleaning: {len(leo_df)}")
 # PART 2: Process Corrections data (CDCR csv)
 # ---------------------------------------------------------------------------
 print("Loading Corrections data...")
-corr_path = os.path.join(INPUT_DIR, "PDSQ118B-C_CDCR Appts&Seps 2005-2023_Final.csv")
+corr_path = os.path.join(
+    INPUT_DIR, "PDSQ118B-C_CDCR Appts&Seps 2005-2023_Final.csv"
+)
 corr_raw = pd.read_csv(corr_path, dtype=str)
 
 corr_raw.columns = [c.strip() for c in corr_raw.columns]
@@ -729,19 +767,26 @@ corr_raw.columns = [c.strip() for c in corr_raw.columns]
 corr_raw["person_nbr"] = corr_raw["UNIQUE ID"].astype(str).str.strip()
 
 # Names: LAST NAME, FIRST NAME (which includes middle initial)
-corr_raw["last_name"] = corr_raw["LAST NAME"].astype(str).str.strip().str.upper()
+corr_raw["last_name"] = (
+    corr_raw["LAST NAME"].astype(str).str.strip().str.upper()
+)
 # First name column includes middle initial after space
 first_mi = corr_raw["FIRST NAME"].astype(str).str.strip().str.upper()
 
 # Vectorized first/middle split
-first_mi_split = first_mi.str.split(r'\s+', n=1, expand=True)
+first_mi_split = first_mi.str.split(r"\s+", n=1, expand=True)
 corr_raw["first_name"] = first_mi_split[0].fillna("").str.strip()
 corr_raw["middle_name"] = first_mi_split[1].fillna("").str.strip()
 
 # Build full_name
 corr_raw["full_name"] = (
-    corr_raw["first_name"] + " " + corr_raw["middle_name"] + " " + corr_raw["last_name"]
+    corr_raw["first_name"]
+    + " "
+    + corr_raw["middle_name"]
+    + " "
+    + corr_raw["last_name"]
 ).str.strip()
+
 
 # Extract facility code from POSITION NUMBER (first segment, zero-pad to 3)
 def extract_facility_code(pos):
@@ -754,15 +799,23 @@ def extract_facility_code(pos):
             return ""
     return ""
 
+
 corr_raw["facility_code"] = (
-    corr_raw["POSITION NUMBER"].astype(str).str.strip()
-    .str.split("-").str[0].str.strip().str.zfill(3)
+    corr_raw["POSITION NUMBER"]
+    .astype(str)
+    .str.strip()
+    .str.split("-")
+    .str[0]
+    .str.strip()
+    .str.zfill(3)
 )
 
 # Build code -> canonical facility name mapping (most frequent per code)
 # Format for agency_name: "NNN: CANONICAL NAME" matching groundtruth
 # First build a code -> gt-style name lookup from the data itself
-facility_name_raw = corr_raw["FACILITY NAME"].astype(str).str.strip().str.upper()
+facility_name_raw = (
+    corr_raw["FACILITY NAME"].astype(str).str.strip().str.upper()
+)
 
 # Build code -> most-frequent raw facility name
 code_name_map = (
@@ -779,12 +832,24 @@ RAW_TO_GT_FACILITY = {
     "025": ("025", "MULE CREEK STATE PRISON"),
     "026": ("026", "AVENAL STATE PRISON"),
     "027": ("027", "CSP - LOS ANGELES COUNTY"),
-    "028": ("028", "CHUCKAWALLA VALLEY STATE PRIS -AKA- CHUCKAWALLA VALLEY STATE PRISO"),
+    "028": (
+        "028",
+        "CHUCKAWALLA VALLEY STATE PRIS -AKA- CHUCKAWALLA VALLEY STATE PRISO",
+    ),
     "030": ("030", "R J DONOVAN CORRECTIONS FACILITY"),
-    "037": ("037", "CALIFORNIA STATE PRISON - LOS ANGELE -AKA- CCHCS-CSP LOS ANGELES"),
-    "041": ("041", "CCHCS-CHUCKAWALLA VALLEY SP -AKA- CHUCKAWALLA VALLEY STATE PRIS"),
+    "037": (
+        "037",
+        "CALIFORNIA STATE PRISON - LOS ANGELE -AKA- CCHCS-CSP LOS ANGELES",
+    ),
+    "041": (
+        "041",
+        "CCHCS-CHUCKAWALLA VALLEY SP -AKA- CHUCKAWALLA VALLEY STATE PRIS",
+    ),
     "042": ("042", "CCHCS-HEADQUARTERS -AKA- HEADQUARTERS"),
-    "048": ("048", "RA MCGEE CORRECTIONS TRAIN CENTER -AKA- RICHARD A MCGEE CORRECTIONS TR CENTER"),
+    "048": (
+        "048",
+        "RA MCGEE CORRECTIONS TRAIN CENTER -AKA- RICHARD A MCGEE CORRECTIONS TR CENTER",
+    ),
     "054": ("054", "CALIFORNIA CORRECTIONAL INSTITUTION"),
     "056": ("056", "CALIFORNIA MEN'S COLONY"),
     "061": ("061", "PAROLE & COMMUNITY SERVICES DIVISION"),
@@ -803,7 +868,10 @@ RAW_TO_GT_FACILITY = {
     "095": ("095", "SAN QUENTIN STATE PRISON"),
     "098": ("098", "SAN QUENTIN STATE PRISON"),
     "099": ("099", "SIERRA CONSERVATION CENTER"),
-    "101": ("101", "CORRECTIONAL TRAINING FACILIT -AKA- CORRECTIONAL TRAINING FACILITY"),
+    "101": (
+        "101",
+        "CORRECTIONAL TRAINING FACILIT -AKA- CORRECTIONAL TRAINING FACILITY",
+    ),
     "106": ("106", "DEUEL VOCATIONAL INSTITUTION"),
     "109": ("109", "CCHCS-DEUEL VOCATIONAL CENTER"),
     "110": ("110", "CDCR ADMIN -AKA- YOUTH AUTHORITY/ADMINISTRATION"),
@@ -811,12 +879,18 @@ RAW_TO_GT_FACILITY = {
     "116": ("116", "CALIFORNIA CITY CORRECTIONAL FACILITY"),
     "123": ("123", "CCHCS-FOLSOM STATE PRISON -AKA- FOLSOM STATE PRISON"),
     "127": ("127", "EL PASO DE ROBLES SCHOOL"),
-    "128": ("128", "CALIFORNIA INSTITUTION FOR WOMEN -AKA- CCHCS-CALIFORNIA INSTITUTION FOR WOMEN"),
+    "128": (
+        "128",
+        "CALIFORNIA INSTITUTION FOR WOMEN -AKA- CCHCS-CALIFORNIA INSTITUTION FOR WOMEN",
+    ),
     "131": ("131", "PRESTON SCHOOL OF INDUSTRY"),
     "133": ("133", "PINE GROVE YOUTH CONS CAMP"),
     "135": ("135", "VENTURA SCHOOL FOR GIRLS"),
     "138": ("138", "YOUTH TRAINING SCHOOL"),
-    "140": ("140", "CDCR/CCHCS CALIFORNIA HEALTH CARE FAC -AKA- CDCR/CCHCS CALIFORNIA HEALTH CARE FACI"),
+    "140": (
+        "140",
+        "CDCR/CCHCS CALIFORNIA HEALTH CARE FAC -AKA- CDCR/CCHCS CALIFORNIA HEALTH CARE FACI",
+    ),
     "143": ("143", "NORTHERN CALIFORNIA YOUTH CENTER"),
     "146": ("146", "O. H. CLOSE SCHOOL"),
     "178": ("178", "CALIPATRIA STATE PRISON"),
@@ -830,9 +904,15 @@ RAW_TO_GT_FACILITY = {
     "403": ("403", "CENTINELA STATE PRISON"),
     "435": ("435", "PLEASANT VALLEY STATE PRISON"),
     "444": ("444", "IRONWOOD STATE PRISON"),
-    "486": ("486", "CALIFORNIA MEDICAL FACILITY-PIP -AKA- CDCR-CALIFORNIA MEDICAL FACILITY-PIP"),
+    "486": (
+        "486",
+        "CALIFORNIA MEDICAL FACILITY-PIP -AKA- CDCR-CALIFORNIA MEDICAL FACILITY-PIP",
+    ),
     "488": ("488", "CDCR-SALINAS VALLEY-PIP -AKA- SALINAS VALLEY - PIP"),
-    "587": ("587", "SUBSTANCE ABUSE TREAT-CORCORA -AKA- SUBSTANCE ABUSE TREAT-CORCORAN"),
+    "587": (
+        "587",
+        "SUBSTANCE ABUSE TREAT-CORCORA -AKA- SUBSTANCE ABUSE TREAT-CORCORAN",
+    ),
     "674": ("674", "CALIFORNIA STATE PRISON - SOLANO"),
     "915": ("915", "DELANO II STATE PRISON -AKA- KERN VALLEY STATE PRISON"),
     "919": ("919", "VALLEY STATE PRISON"),
@@ -860,7 +940,13 @@ for _, row in unique_fc_fn.iterrows():
     fc_fn_map[(fc, str(fn).strip().upper())] = get_corrections_agency(fc, fn)
 
 # Map using combined key
-corr_raw["_fc_fn_key"] = list(zip(corr_raw["facility_code"], corr_raw["FACILITY NAME"].astype(str).str.strip().str.upper()))
+corr_raw["_fc_fn_key"] = list(
+    zip(
+        corr_raw["facility_code"],
+        corr_raw["FACILITY NAME"].astype(str).str.strip().str.upper(),
+        strict=False,
+    )
+)
 corr_raw["agency_name"] = corr_raw["_fc_fn_key"].map(fc_fn_map)
 
 # ---------------------------------------------------------------------------
@@ -870,8 +956,13 @@ corr_raw["agency_name"] = corr_raw["_fc_fn_key"].map(fc_fn_map)
 # ---------------------------------------------------------------------------
 print("Building corrections employment periods...")
 
-corr_raw["trans_date"] = pd.to_datetime(corr_raw["TRANS EFF DATE"], errors="coerce")
-corr_raw["type_of_trans"] = corr_raw["TYPE OF TRANSACTION"].astype(str).str.strip().str.upper()
+corr_raw["trans_date"] = pd.to_datetime(
+    corr_raw["TRANS EFF DATE"], errors="coerce"
+)
+corr_raw["type_of_trans"] = (
+    corr_raw["TYPE OF TRANSACTION"].astype(str).str.strip().str.upper()
+)
+
 
 # Normalize POSITION NUMBER: zero-pad the first segment to 3 digits
 # e.g. "26-210-9662-902" -> "026-210-9662-902"
@@ -882,19 +973,26 @@ def normalize_pos(pos):
         parts[0] = parts[0].strip().zfill(3)
     return "-".join(parts)
 
-corr_raw["pos_norm"] = corr_raw["POSITION NUMBER"].astype(str).apply(normalize_pos)
+
+corr_raw["pos_norm"] = (
+    corr_raw["POSITION NUMBER"].astype(str).apply(normalize_pos)
+)
 
 # For each (person, position_number) group:
 # - start = min date of APPOINTMENT/CHANGE records
 # - end   = max date of SEPARATION records (may be absent = still employed)
 # - use demographics/agency from the first APPOINTMENT/CHANGE record
 
-appts = corr_raw[corr_raw["type_of_trans"].isin(["APPOINTMENT", "CHANGE"])].copy()
+appts = corr_raw[
+    corr_raw["type_of_trans"].isin(["APPOINTMENT", "CHANGE"])
+].copy()
 seps = corr_raw[corr_raw["type_of_trans"] == "SEPARATION"].copy()
 
 # Group appointments: take min date and associated metadata
 appts_sorted = appts.sort_values(["person_nbr", "pos_norm", "trans_date"])
-appt_first = appts_sorted.drop_duplicates(subset=["person_nbr", "pos_norm"], keep="first")
+appt_first = appts_sorted.drop_duplicates(
+    subset=["person_nbr", "pos_norm"], keep="first"
+)
 
 # Min start date per (person, position)
 appt_min = (
@@ -913,9 +1011,18 @@ sep_max = (
 )
 
 # Merge metadata from first appointment
-keep_cols = ["person_nbr", "pos_norm", "facility_code", "FACILITY NAME",
-             "CLASS TITLE", "last_name", "first_name", "middle_name",
-             "full_name", "agency_name"]
+keep_cols = [
+    "person_nbr",
+    "pos_norm",
+    "facility_code",
+    "FACILITY NAME",
+    "CLASS TITLE",
+    "last_name",
+    "first_name",
+    "middle_name",
+    "full_name",
+    "agency_name",
+]
 appt_meta = appt_first[keep_cols].copy()
 
 # Build pairs: merge start dates + metadata + end dates
@@ -941,14 +1048,23 @@ pairs = pairs[pairs["start_date"] != ""]
 
 # Select columns
 corr_cols = [
-    "person_nbr", "first_name", "middle_name", "last_name",
-    "full_name", "agency_name", "start_date", "end_date",
-    "rank", "type",
+    "person_nbr",
+    "first_name",
+    "middle_name",
+    "last_name",
+    "full_name",
+    "agency_name",
+    "start_date",
+    "end_date",
+    "rank",
+    "type",
 ]
 corr_df = pairs[corr_cols].copy()
 
 # Dedup on person_nbr + agency_name + start_date
-corr_df = corr_df.drop_duplicates(subset=["person_nbr", "agency_name", "start_date"])
+corr_df = corr_df.drop_duplicates(
+    subset=["person_nbr", "agency_name", "start_date"]
+)
 
 print(f"Corrections rows after processing: {len(corr_df)}")
 
@@ -965,7 +1081,9 @@ corr_df["separation_reason"] = ""
 combined = pd.concat([leo_df, corr_df], ignore_index=True, sort=False)
 
 # Final cleanup
-combined["person_nbr"] = combined["person_nbr"].astype(str).str.strip().str.lower()
+combined["person_nbr"] = (
+    combined["person_nbr"].astype(str).str.strip().str.lower()
+)
 combined["first_name"] = combined["first_name"].astype(str).str.strip()
 combined["last_name"] = combined["last_name"].astype(str).str.strip()
 combined["agency_name"] = combined["agency_name"].astype(str).str.strip()
@@ -973,27 +1091,46 @@ combined["start_date"] = combined["start_date"].astype(str).str.strip()
 combined["end_date"] = combined["end_date"].astype(str).str.strip()
 
 # Ensure no NaT/None in date columns
-combined["start_date"] = combined["start_date"].replace({"NaT": "", "None": "", "nan": ""})
-combined["end_date"] = combined["end_date"].replace({"NaT": "", "None": "", "nan": ""})
+combined["start_date"] = combined["start_date"].replace(
+    {"NaT": "", "None": "", "nan": ""}
+)
+combined["end_date"] = combined["end_date"].replace(
+    {"NaT": "", "None": "", "nan": ""}
+)
 
 # Drop rows with empty start_date (pipeline drops anyway)
 combined = combined[combined["start_date"] != ""]
 
 # Drop rows with no person_nbr
-combined = combined[combined["person_nbr"].notna() & (combined["person_nbr"] != "") & (combined["person_nbr"] != "nan")]
+combined = combined[
+    combined["person_nbr"].notna()
+    & (combined["person_nbr"] != "")
+    & (combined["person_nbr"] != "nan")
+]
 
 # Dedup
-dupe_before = combined.duplicated(subset=["person_nbr", "agency_name", "start_date"]).sum()
+dupe_before = combined.duplicated(
+    subset=["person_nbr", "agency_name", "start_date"]
+).sum()
 if dupe_before > 0:
     print(f"Dropping {dupe_before} duplicate rows")
-    combined = combined.drop_duplicates(subset=["person_nbr", "agency_name", "start_date"])
+    combined = combined.drop_duplicates(
+        subset=["person_nbr", "agency_name", "start_date"]
+    )
 
 print(f"Final combined rows: {len(combined)}")
 
 # ---------------------------------------------------------------------------
 # Validate
 # ---------------------------------------------------------------------------
-required = ["person_nbr", "first_name", "last_name", "agency_name", "start_date", "end_date"]
+required = [
+    "person_nbr",
+    "first_name",
+    "last_name",
+    "agency_name",
+    "start_date",
+    "end_date",
+]
 missing_cols = [c for c in required if c not in combined.columns]
 assert not missing_cols, f"Missing required columns: {missing_cols}"
 
@@ -1002,15 +1139,26 @@ assert (combined["start_date"] != "").all(), "start_date must not be empty"
 for col in required:
     empty_count = (combined[col].isna() | (combined[col] == "")).sum()
     if empty_count > 0:
-        print(f"Warning: {col} has {empty_count} empty values ({empty_count/len(combined):.1%})")
+        print(
+            f"Warning: {col} has {empty_count} empty values ({empty_count / len(combined):.1%})"
+        )
 
 # ---------------------------------------------------------------------------
 # Write output
 # ---------------------------------------------------------------------------
 out_cols = [
-    "person_nbr", "first_name", "middle_name", "last_name", "suffix",
-    "full_name", "agency_name", "start_date", "end_date",
-    "rank", "separation_reason", "type",
+    "person_nbr",
+    "first_name",
+    "middle_name",
+    "last_name",
+    "suffix",
+    "full_name",
+    "agency_name",
+    "start_date",
+    "end_date",
+    "rank",
+    "separation_reason",
+    "type",
 ]
 # Only include columns that exist
 out_cols = [c for c in out_cols if c in combined.columns]
