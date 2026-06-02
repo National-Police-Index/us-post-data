@@ -1,39 +1,46 @@
+"""
+Upload preprocessed state .csv.gz files to Firebase Firestore.
+
+Reads from db/data/output/<STATE>/
+Writes to Firestore collection: db_launch
+
+Document ID pattern: <state>-processed.csv_<row_index>
+                 or: <state>-discipline-processed.csv_<row_index>
+
+Use --dry-run to validate without writing to Firebase.
+"""
+
 import argparse
 import csv
 import gzip
 import os
 import time
 
-import firebase_admin
-from firebase_admin import credentials, firestore
-from google.api_core.exceptions import DeadlineExceeded, ResourceExhausted
-from tenacity import (
-    retry,
-    retry_if_exception_type,
-    stop_after_attempt,
-    wait_exponential,
-)
+
+# Firebase imports are deferred so --dry-run works without credentials
+_firebase_initialized = False
 
 
-# Initialize Firebase Admin SDK
-cred = credentials.Certificate("serviceAccountKey.json")
-firebase_admin.initialize_app(cred)
+def _init_firebase():
+    global _firebase_initialized
+    if _firebase_initialized:
+        return
+    import firebase_admin
+    from firebase_admin import credentials
 
-# Get a Firestore client
-db = firestore.client()
+    cred = credentials.Certificate("serviceAccountKey.json")
+    firebase_admin.initialize_app(cred)
+    _firebase_initialized = True
 
 
-@retry(
-    stop=stop_after_attempt(10),
-    wait=wait_exponential(multiplier=1, min=4, max=60),
-    retry=retry_if_exception_type((ResourceExhausted, DeadlineExceeded)),
-)
-def commit_batch(batch):
-    batch.commit()
+def _get_db():
+    from firebase_admin import firestore
+
+    return firestore.client()
 
 
 def read_csv_gz_in_batches(file_path, batch_size=1000):
-    with gzip.open(file_path, "rt") as f:
+    with gzip.open(file_path, "rt", encoding="utf-8") as f:
         reader = csv.DictReader(f)
         batch = []
         for row in reader:
@@ -45,24 +52,38 @@ def read_csv_gz_in_batches(file_path, batch_size=1000):
             yield batch
 
 
-def check_state_exists(state_name):
-    """Check if state data already exists in Firestore by looking for its first
-    document"""
-    doc_id = f"{state_name}-processed.csv_0"
-    doc_ref = db.collection("db_launch").document(doc_id)
-    doc = doc_ref.get()
-    return doc.exists
+def count_rows(file_path):
+    """Count rows in a .csv.gz without loading it all into memory."""
+    count = 0
+    with gzip.open(file_path, "rt", encoding="utf-8") as f:
+        reader = csv.DictReader(f)
+        for _ in reader:
+            count += 1
+    return count
 
 
-def delete_state_data(state_name):
-    """Delete all documents for a given state based on document ID pattern"""
-    print(f"Deleting existing data for {state_name}...")
+def doc_id_prefix(file_path):
+    """Derive Firestore document ID prefix from filename.
+
+    db/data/output/georgia/georgia-processed.csv.gz
+        → "georgia-processed.csv"
+    db/data/output/georgia/georgia-discipline-processed.csv.gz
+        → "georgia-discipline-processed.csv"
+    """
+    basename = os.path.basename(file_path)  # georgia-processed.csv.gz
+    return basename.replace(".gz", "")  # georgia-processed.csv
+
+
+def check_state_exists(db, prefix):
+    doc_ref = db.collection("db_launch").document(f"{prefix}_0")
+    return doc_ref.get().exists
+
+
+def delete_state_data(db, prefix):
+    print(f"  Deleting existing documents for prefix '{prefix}'...")
     batch_size = 1000
-    docs_deleted = 0
-    prefix = f"{state_name}-processed.csv"
-
+    deleted = 0
     while True:
-        # Get a batch of documents with matching prefix
         query = (
             db.collection("db_launch")
             .order_by("__name__")
@@ -71,183 +92,204 @@ def delete_state_data(state_name):
             .limit(batch_size)
         )
         docs = list(query.stream())
-
         if not docs:
             break
-
-        # Delete documents in batches
         batch = db.batch()
         for doc in docs:
             batch.delete(doc.reference)
-            docs_deleted += 1
-
+            deleted += 1
         batch.commit()
         time.sleep(1)
-        print(f"Deleted {docs_deleted} documents...")
-
-    print(f"Finished deleting {docs_deleted} documents for {state_name}")
+    print(f"  Deleted {deleted} documents")
 
 
-def upload_csv_gz_to_firestore(
-    file_path, state_name, force=False, batch_size=1000
+def upload_file(
+    file_path, prefix, force=False, batch_size=1000, dry_run=False, limit=None
 ):
-    if force:
-        print(f"Force upload requested for {state_name}")
-        if check_state_exists(state_name):
-            print(f"Deleting existing data for {state_name}")
-            delete_state_data(state_name)
-        else:
-            print(f"No existing data found for {state_name}")
-    elif check_state_exists(state_name):
-        print(f"Skipping {state_name} - data already exists in Firestore")
-        return
+    from google.api_core.exceptions import DeadlineExceeded, ResourceExhausted
+    from tenacity import (
+        retry,
+        retry_if_exception_type,
+        stop_after_attempt,
+        wait_exponential,
+    )
 
-    total_rows = 0
+    if dry_run:
+        row_count = count_rows(file_path)
+        effective = min(row_count, limit) if limit else row_count
+        print(
+            f"  [DRY RUN] Would upload {effective:,} rows as prefix '{prefix}'"
+            + (f" (capped at {limit:,})" if limit and limit < row_count else "")
+        )
+        print(f"  [DRY RUN] First doc ID would be: {prefix}_0")
+        print(f"  [DRY RUN] Last doc ID would be:  {prefix}_{effective - 1}")
+        return "dry_run"
+
+    db = _get_db()
+
+    @retry(
+        stop=stop_after_attempt(10),
+        wait=wait_exponential(multiplier=1, min=4, max=60),
+        retry=retry_if_exception_type((ResourceExhausted, DeadlineExceeded)),
+    )
+    def commit_batch(b):
+        b.commit()
+
+    if force:
+        if check_state_exists(db, prefix):
+            delete_state_data(db, prefix)
+    elif check_state_exists(db, prefix):
+        print("  Skipping — data already exists (use --force to overwrite)")
+        return "skipped"
+
+    total = 0
     start_time = time.time()
 
     for csv_batch in read_csv_gz_in_batches(file_path, batch_size):
-        firestore_batch = db.batch()
-
+        fb_batch = db.batch()
         for row in csv_batch:
-            # Removed state field as we're using document ID patterns instead
-            doc_ref = db.collection("db_launch").document(
-                f"{state_name}-processed.csv_{total_rows}"
-            )
-            firestore_batch.set(doc_ref, row)
-            total_rows += 1
-
-        commit_batch(firestore_batch)
+            if limit and total >= limit:
+                break
+            doc_ref = db.collection("db_launch").document(f"{prefix}_{total}")
+            fb_batch.set(doc_ref, row)
+            total += 1
+        commit_batch(fb_batch)
         time.sleep(1)
+        elapsed = time.time() - start_time
+        print(f"  Committed {total:,} docs ({total / elapsed:.0f} rows/s)")
+        if limit and total >= limit:
+            print(f"  Reached limit of {limit:,} rows — stopping.")
+            break
 
-        elapsed_time = time.time() - start_time
-        rows_per_second = total_rows / elapsed_time
-        print(
-            f"Committed {total_rows} documents. Speed: {rows_per_second:.2f} rows/second"
-        )
+    elapsed = time.time() - start_time
+    print(f"  Finished: {total:,} docs in {elapsed:.1f}s")
+    return "success"
 
-    print(f"Finished uploading {total_rows} documents from {file_path}.")
-    print(f"Total time: {elapsed_time:.2f} seconds")
-    print(f"Average speed: {rows_per_second:.2f} rows/second")
+
+def find_processed_files(input_dir, states=None):
+    """
+    Return list of (file_path, prefix) for all .csv.gz files found under input_dir.
+    Optionally filter to specific state directory names.
+    """
+    found = []
+    if not os.path.exists(input_dir):
+        return found
+
+    state_dirs = [
+        d
+        for d in os.listdir(input_dir)
+        if os.path.isdir(os.path.join(input_dir, d))
+    ]
+    if states:
+        states_lower = {s.lower() for s in states}
+        state_dirs = [d for d in state_dirs if d.lower() in states_lower]
+
+    for state_dir in state_dirs:
+        dir_path = os.path.join(input_dir, state_dir)
+        for fname in os.listdir(dir_path):
+            if fname.endswith(".csv.gz"):
+                file_path = os.path.join(dir_path, fname)
+                prefix = fname.replace(".gz", "")  # e.g. georgia-processed.csv
+                found.append((file_path, prefix))
+
+    return found
 
 
 def main():
     parser = argparse.ArgumentParser(
-        description="Upload processed CSV files to Firebase"
+        description="Upload processed state CSVs to Firebase Firestore"
     )
     parser.add_argument(
         "--input-dir",
-        type=str,
-        required=True,
-        help="Input directory containing processed .csv.gz files",
+        default="../data/output",
+        help="Directory containing processed .csv.gz files (default: ../data/output)",
+    )
+    parser.add_argument(
+        "--states",
+        nargs="+",
+        help="Upload only these state directories (default: all)",
+    )
+    parser.add_argument(
+        "--force",
+        action="store_true",
+        help="Delete and re-upload states that already exist in Firebase",
     )
     parser.add_argument(
         "--delay",
         type=int,
         default=5,
-        help="Delay in seconds between file uploads (default: 5)",
+        help="Seconds to wait between file uploads (default: 5)",
     )
     parser.add_argument(
-        "--force-states",
-        type=str,
-        nargs="+",
-        help="List of states to force upload (deletes existing data first)",
-    )
-    parser.add_argument(
-        "--force-all",
+        "--dry-run",
         action="store_true",
-        help="Force upload all states (deletes existing data first)",
+        help=(
+            "Validate and print upload manifest without writing to Firebase. "
+            "No Firebase credentials required."
+        ),
+    )
+    parser.add_argument(
+        "--limit",
+        type=int,
+        default=None,
+        metavar="N",
+        help="Cap upload at N rows per file (for testing)",
     )
     args = parser.parse_args()
 
-    if not os.path.exists(args.input_dir):
-        raise ValueError(f"Input directory does not exist: {args.input_dir}")
+    if not args.dry_run:
+        _init_firebase()
 
-    # Get all state directories from input
-    state_dirs = [
-        d
-        for d in os.listdir(args.input_dir)
-        if os.path.isdir(os.path.join(args.input_dir, d))
-    ]
-
-    # Convert force_states list to lowercase set for matching
-    force_states = {state.lower() for state in (args.force_states or [])}
-
-    # If force_all is True, add all available states to force_states
-    if args.force_all:
-        force_states = {state.lower() for state in state_dirs}
-        print(f"Force uploading all {len(force_states)} available states")
-
-    # Get all .csv.gz files from state directories
-    csv_gz_files = []
-    for state in state_dirs:
-        state_file = os.path.join(
-            args.input_dir, state, f"{state}-processed.csv.gz"
-        )
-        if os.path.exists(state_file):
-            csv_gz_files.append(state_file)
-
-    if not csv_gz_files:
+    files = find_processed_files(args.input_dir, states=args.states)
+    if not files:
         print(f"No .csv.gz files found in {args.input_dir}")
         return
 
-    print(f"Found {len(csv_gz_files)} files to upload")
+    if args.dry_run:
+        print(f"[DRY RUN] Found {len(files)} file(s) to upload:\n")
+    else:
+        print(f"Found {len(files)} file(s) to upload\n")
 
-    skipped_states = []
-    successful_states = []
-    failed_states = []
-    forced_states = []
+    results = {"success": [], "skipped": [], "failed": [], "dry_run": []}
 
-    for file_path in csv_gz_files:
-        state_name = os.path.basename(os.path.dirname(file_path))
-        print(f"\nProcessing {state_name}...")
+    for i, (file_path, prefix) in enumerate(files):
+        state_dir = os.path.basename(os.path.dirname(file_path))
+        print(f"[{state_dir}] {os.path.basename(file_path)}")
 
         try:
-            force_state = state_name.lower() in force_states
-
-            if not force_state and check_state_exists(state_name):
-                print(
-                    f"Skipping {state_name} - data already exists in Firebase"
-                )
-                skipped_states.append(state_name)
-                continue
-
-            if force_state:
-                print(f"Force uploading {state_name}")
-                forced_states.append(state_name)
-
-            upload_csv_gz_to_firestore(file_path, state_name, force=force_state)
-            print(f"Successfully uploaded {state_name}")
-            successful_states.append(state_name)
-
+            status = upload_file(
+                file_path,
+                prefix,
+                force=args.force,
+                dry_run=args.dry_run,
+                limit=args.limit,
+            )
+            results[status].append(prefix)
         except Exception as e:
-            print(f"Error uploading {state_name}: {str(e)}")
-            failed_states.append(state_name)
+            print(f"  Error: {e}")
+            results["failed"].append(prefix)
 
-        if file_path != csv_gz_files[-1]:
-            print(f"Waiting {args.delay} seconds before next upload...")
+        if not args.dry_run and i < len(files) - 1:
+            print(f"  Waiting {args.delay}s...\n")
             time.sleep(args.delay)
+        else:
+            print()
 
-    # Print summary
-    print("\nUpload Summary:")
-    print(f"Successfully uploaded: {len(successful_states)} states")
-    print(f"Force uploaded: {len(forced_states)} states")
-    print(f"Skipped (existing data): {len(skipped_states)} states")
-    print(f"Failed uploads: {len(failed_states)} states")
-
-    if forced_states:
-        print("\nForce uploaded states:")
-        for state in sorted(forced_states):
-            print(f"  - {state}")
-
-    if skipped_states:
-        print("\nSkipped states:")
-        for state in sorted(skipped_states):
-            print(f"  - {state}")
-
-    if failed_states:
-        print("\nFailed states:")
-        for state in sorted(failed_states):
-            print(f"  - {state}")
+    print("=" * 50)
+    if args.dry_run:
+        print(
+            f"[DRY RUN] Summary: {len(results['dry_run'])} file(s) would be uploaded"
+        )
+        if results["failed"]:
+            print(f"  Errors encountered: {len(results['failed'])}")
+            for p in results["failed"]:
+                print(f"    - {p}")
+    else:
+        print(
+            f"Done. Uploaded: {len(results['success'])}  "
+            f"Skipped: {len(results['skipped'])}  "
+            f"Failed: {len(results['failed'])}"
+        )
 
 
 if __name__ == "__main__":

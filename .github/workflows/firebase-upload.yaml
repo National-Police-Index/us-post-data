@@ -1,0 +1,128 @@
+name: Firebase Upload
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "pipeline/data/registry.csv"
+  workflow_dispatch:
+
+jobs:
+  upload:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GH_PAT }}
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Write Firebase service account key
+        run: |
+          echo '${{ secrets.FIREBASE_SERVICE_ACCOUNT_JSON }}' \
+            > db/upload/serviceAccountKey.json
+
+      - name: Configure git
+        run: |
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git config user.name "github-actions[bot]"
+
+      - name: Upload and mark registry
+        run: |
+          python - <<'EOF'
+          import csv, os, subprocess, sys
+
+          registry_path = "pipeline/data/registry.csv"
+
+          with open(registry_path, newline="") as f:
+              rows = list(csv.DictReader(f))
+
+          # Find highest cleaned+unpushed year per state
+          targets = {}
+          for row in rows:
+              if row["cleaned"] == "yes" and row["firebase_pushed"] == "no":
+                  state = row["state"]
+                  year = row["year"]
+                  if state not in targets or year > targets[state]:
+                      targets[state] = year
+
+          if not targets:
+              print("Nothing to upload.")
+              sys.exit(0)
+
+          uploaded = []
+          for state, year in targets.items():
+              output_dir = os.path.join("db", "data", "output", state)
+              if not os.path.isdir(output_dir):
+                  print(f"[{state}] No .csv.gz found in {output_dir} — skipping")
+                  continue
+              print(f"Uploading {state} (year={year})...")
+              result = subprocess.run(
+                  [
+                      "python3", "src/src.py",
+                      "--input-dir", "../data/output",
+                      "--states", state,
+                      "--force",
+                      "--limit", "1000",
+                  ],
+                  cwd="db/upload",
+                  check=False,
+              )
+              if result.returncode != 0:
+                  print(f"[{state}] Upload failed — registry not updated")
+                  continue
+              uploaded.append((state, year))
+
+          if not uploaded:
+              print("No states uploaded successfully.")
+              sys.exit(1)
+
+          # Update registry: mark target year as pushed, older as skipped
+          uploaded_map = dict(uploaded)
+          updated_rows = []
+          for row in rows:
+              state = row["state"]
+              year = row["year"]
+              if state in uploaded_map:
+                  if year == uploaded_map[state]:
+                      row["firebase_pushed"] = "yes"
+                  elif (
+                      row["cleaned"] == "yes"
+                      and row["firebase_pushed"] == "no"
+                      and year < uploaded_map[state]
+                  ):
+                      row["firebase_pushed"] = "skipped"
+              updated_rows.append(row)
+
+          with open(registry_path, "w", newline="") as f:
+              writer = csv.DictWriter(
+                  f,
+                  fieldnames=["state", "year", "cleaned", "firebase_pushed"],
+              )
+              writer.writeheader()
+              writer.writerows(updated_rows)
+
+          print(f"Updated registry for: {[s for s, _ in uploaded]}")
+          EOF
+
+      - name: Commit updated registry
+        run: |
+          git stash
+          git fetch origin main
+          git rebase origin/main
+          git stash pop
+          git add pipeline/data/registry.csv
+          git diff --cached --quiet || \
+            git commit -m "data: mark firebase_pushed after upload [skip ci]"
+          git push origin HEAD:main
+
+      - name: Remove service account key
+        if: always()
+        run: rm -f db/upload/serviceAccountKey.json
