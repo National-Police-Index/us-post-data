@@ -84,6 +84,7 @@ def make_samples(df, n_samples, sample_size=500, random_state=81):
     for i in range(n_samples):
         single_slice = single_id.iloc[i * n_single_needed : (i + 1) * n_single_needed]
         sample = pd.concat([multiple_ids, single_slice]).reset_index(drop=True)
+        sample['Match/No Match'] = None
         sample.to_csv(f"SAMPLES_MediumHigh_Matches_{i}.csv", index=False)
 
 
@@ -103,7 +104,6 @@ def separate_match_tiers(df):
     return exact, high, medium_high, low
 
 def main(path_to_all_matched_records, n_samples, sample_size):
-    path_to_all_matched_records = '/Users/mahajabin/Desktop/Projects/NPI/all_matches_70.csv'
     matches = process_data(path_to_all_matched_records)
     # get medium-high matches
     exact, high, medium_high, low = separate_match_tiers(matches)
