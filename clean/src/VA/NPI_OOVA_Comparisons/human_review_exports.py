@@ -20,7 +20,10 @@ def process_data(path_to_records):
     # for stints that fall into multiple confidence groups based on categories, round to lowest confidence tier, dropping any NPI-OOVA pair duplicates
     all_matches['min_score'] = all_matches[['agency_name_score', 'full_name_score']].min(axis=1)
     keys = ['person_nbr', 'officer_id', 'full_name', 'agency_name', 'start_date', 'end_date']
+
     all_matches = (all_matches.sort_values('min_score', ascending=True).drop_duplicates(subset=keys, keep='first'))
+    # replacing 'nan' with 'current' according to intrepretation that no end date means officer is active. 
+    all_matches["end_date"][all_matches["end_date"].isna()] = 'current'
 
     #there should be no NPI-OOVA duplicates at this point
     matches_collapsed = (all_matches.groupby(['person_nbr'], as_index=True).apply(collapse_history).reset_index(drop=False)).reset_index(drop=True) 
@@ -40,6 +43,8 @@ def process_data(path_to_records):
 def collapse_history(group):
     # this collapses history (multiple stints) of unique person-nbr and OOVA links. 
     group = group.sort_values('start_date')
+
+    
     npi_history = '\n'.join(f"{row.start_date} - {row.end_date}: {row.agency_name}" for row in group.itertuples())
     oova_history = '\n'.join(f"{row.start_date} - {row.end_date}: {row.oov_agency_name}" for row in group.itertuples())
   
@@ -79,7 +84,7 @@ def make_samples(df, n_samples, sample_size=500, random_state=81):
     for i in range(n_samples):
         single_slice = single_id.iloc[i * n_single_needed : (i + 1) * n_single_needed]
         sample = pd.concat([multiple_ids, single_slice]).reset_index(drop=True)
-        sample.to_csv(f"SAMPLES_MediumHigh_Matches_{i}.csv")
+        sample.to_csv(f"SAMPLES_MediumHigh_Matches_{i}.csv", index=False)
 
 
 
