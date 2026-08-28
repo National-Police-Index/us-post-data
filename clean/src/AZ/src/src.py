@@ -4,7 +4,7 @@ import pandas as pd
 
 def read_tbl():
     """Read and prepare the officer appointments data"""
-    df = pd.read_csv("../data/input/2025-8-26/Officer List 082225.csv")
+    df = pd.read_excel("2025-8-26/Officer List 082225.xlsx")
 
     df = df.rename(
         columns={
@@ -72,48 +72,48 @@ def clean_agency_name(df):
     return df
 
 
-def read_ori():
-    """Read and prepare the ORI agency reference data"""
-    df = pd.read_csv("../data/input/da35158-0001.csv")
+# def read_ori():
+#     """Read and prepare the ORI agency reference data"""
+#     df = pd.read_csv("da35158-0001.csv")
 
-    df = df[
-        [
-            "ORI9",
-            "ORI7",
-            "NAME",
-            "COUNTYNAME",
-            "AGCYTYPE",
-            "ADDRESS_NAME",
-            "ADDRESS_STR1",
-            "ADDRESS_STR2",
-            "ADDRESS_CITY",
-            "ADDRESS_STATE",
-            "ADDRESS_ZIP",
-            "LG_POPULATION",
-            "INTPTLAT",
-            "INTPTLONG",
-        ]
-    ]
+#     df = df[
+#         [
+#             "ORI9",
+#             "ORI7",
+#             "NAME",
+#             "COUNTYNAME",
+#             "AGCYTYPE",
+#             "ADDRESS_NAME",
+#             "ADDRESS_STR1",
+#             "ADDRESS_STR2",
+#             "ADDRESS_CITY",
+#             "ADDRESS_STATE",
+#             "ADDRESS_ZIP",
+#             "LG_POPULATION",
+#             "INTPTLAT",
+#             "INTPTLONG",
+#         ]
+#     ]
 
-    df = df.rename(
-        columns={
-            "ORI9": "ori_9",
-            "ORI7": "ori_7",
-            "NAME": "ori_name",
-            "COUNTYNAME": "county",
-            "AGCYTYPE": "type",
-            "ADDRESS_NAME": "addr_name",
-            "ADDRESS_STR1": "addr_street_one",
-            "ADDRESS_STR2": "addr_street_two",
-            "ADDRESS_CITY": "city",
-            "ADDRESS_STATE": "state",
-            "ADDRESS_ZIP": "zipcode",
-            "LG_POPULATION": "population_served",
-            "INTPTLAT": "latitude",
-            "INTPTLONG": "longitude",
-        }
-    )
-    return df
+#     df = df.rename(
+#         columns={
+#             "ORI9": "ori_9",
+#             "ORI7": "ori_7",
+#             "NAME": "ori_name",
+#             "COUNTYNAME": "county",
+#             "AGCYTYPE": "type",
+#             "ADDRESS_NAME": "addr_name",
+#             "ADDRESS_STR1": "addr_street_one",
+#             "ADDRESS_STR2": "addr_street_two",
+#             "ADDRESS_CITY": "city",
+#             "ADDRESS_STATE": "state",
+#             "ADDRESS_ZIP": "zipcode",
+#             "LG_POPULATION": "population_served",
+#             "INTPTLAT": "latitude",
+#             "INTPTLONG": "longitude",
+#         }
+#     )
+#     return df
 
 
 def create_officers_table(df):
@@ -271,7 +271,7 @@ def create_agencies_table(ori_df, appointments_df):
     return agencies
 
 
-def create_appointments_table(appointments_df, agencies_df):
+def create_appointments_table(appointments_df):
     """
     Create appointments table linking officers to agencies.
     Deduplicate based on unique combination of person_nbr, agency_ori, start_date, end_date.
@@ -282,43 +282,43 @@ def create_appointments_table(appointments_df, agencies_df):
     appointments = appointments_df.copy()
 
     # First, match agencies by ORI code
-    agencies_with_ori = agencies_df[agencies_df["ori_9"].notna()][
-        ["id", "ori_9", "name"]
-    ].copy()
-    agencies_with_ori = agencies_with_ori.rename(columns={"id": "agency_id"})
+    # agencies_with_ori = agencies_df[agencies_df["ori_9"].notna()][
+    #     ["id", "ori_9", "name"]
+    # ].copy()
+    # agencies_with_ori = agencies_with_ori.rename(columns={"id": "agency_id"})
 
-    appointments = appointments.merge(
-        agencies_with_ori[["agency_id", "ori_9"]],
-        left_on="agency_ori",
-        right_on="ori_9",
-        how="left",
-    )
+    # appointments = appointments.merge(
+    #     agencies_with_ori[["agency_id", "ori_9"]],
+    #     left_on="agency_ori",
+    #     right_on="ori_9",
+    #     how="left",
+    # )
 
     # For appointments without ORI match, try to match by name
-    no_match_mask = appointments["agency_id"].isna()
-    if no_match_mask.any():
-        agencies_no_ori = agencies_df[agencies_df["ori_9"].isna()][
-            ["id", "name"]
-        ].copy()
-        agencies_no_ori = agencies_no_ori.rename(
-            columns={"id": "agency_id_by_name"}
-        )
+    # no_match_mask = appointments["agency_id"].isna()
+    # if no_match_mask.any():
+    #     agencies_no_ori = agencies_df[agencies_df["ori_9"].isna()][
+    #         ["id", "name"]
+    #     ].copy()
+    #     agencies_no_ori = agencies_no_ori.rename(
+    #         columns={"id": "agency_id_by_name"}
+    #     )
 
-        # Merge on agency name for those without ORI match
-        appointments = appointments.merge(
-            agencies_no_ori, left_on="agency_name", right_on="name", how="left"
-        )
+    #     # Merge on agency name for those without ORI match
+    #     appointments = appointments.merge(
+    #         agencies_no_ori, left_on="agency_name", right_on="name", how="left"
+    #     )
 
-        # Fill in agency_id from name match where ORI match failed
-        appointments.loc[no_match_mask, "agency_id"] = appointments.loc[
-            no_match_mask, "agency_id_by_name"
-        ]
+    #     # Fill in agency_id from name match where ORI match failed
+    #     appointments.loc[no_match_mask, "agency_id"] = appointments.loc[
+    #         no_match_mask, "agency_id_by_name"
+    #     ]
 
-        # Drop temporary columns
-        if "agency_id_by_name" in appointments.columns:
-            appointments = appointments.drop(
-                columns=["agency_id_by_name", "name"]
-            )
+    #     # Drop temporary columns
+    #     if "agency_id_by_name" in appointments.columns:
+    #         appointments = appointments.drop(
+    #             columns=["agency_id_by_name", "name"]
+    #         )
 
     # officer_id is the same as person_nbr (since we use person_nbr as officer.id)
     appointments["officer_id"] = appointments["person_nbr"]
@@ -340,7 +340,6 @@ def create_appointments_table(appointments_df, agencies_df):
         [
             "person_nbr",
             "officer_id",
-            "agency_id",
             "rank",
             "start_date",
             "end_date",
@@ -378,17 +377,17 @@ if __name__ == "__main__":
     appointments_raw = az_raw.pipe(clean_sep_reason).pipe(clean_agency_name)
 
     # Read ORI data
-    ori_data = read_ori()
+    # ori_data = read_ori()
 
     # Generate the three tables
     print("\nGenerating officers table...")
     officers = create_officers_table(appointments_raw)
 
     print("Generating agencies table...")
-    agencies = create_agencies_table(ori_data, appointments_raw)
+    # agencies = create_agencies_table(ori_data, appointments_raw)
 
     print("Generating appointments table...")
-    appointments = create_appointments_table(appointments_raw, agencies)
+    appointments = create_appointments_table(appointments_raw)
 
     # Display results
     print("\n" + "=" * 80)
@@ -399,13 +398,13 @@ if __name__ == "__main__":
     print("\nFirst 5 rows:")
     print(officers.head())
 
-    print("\n" + "=" * 80)
-    print("AGENCIES TABLE")
-    print("=" * 80)
-    print(f"Shape: {agencies.shape}")
-    print(f"\nColumns: {list(agencies.columns)}")
-    print("\nFirst 5 rows:")
-    print(agencies.head())
+    # print("\n" + "=" * 80)
+    # print("AGENCIES TABLE")
+    # print("=" * 80)
+    # print(f"Shape: {agencies.shape}")
+    # print(f"\nColumns: {list(agencies.columns)}")
+    # print("\nFirst 5 rows:")
+    # print(agencies.head())
 
     print("\n" + "=" * 80)
     print("APPOINTMENTS TABLE")
@@ -422,10 +421,10 @@ if __name__ == "__main__":
 
     output_dir = "../data/output"
     officers.to_csv(f"{output_dir}/officers.csv", index=False)
-    agencies.to_csv(f"{output_dir}/agencies.csv", index=False)
+    # agencies.to_csv(f"{output_dir}/agencies.csv", index=False)
     appointments.to_csv(f"{output_dir}/appointments.csv", index=False)
 
     print(f"\n✓ officers.csv saved ({len(officers)} records)")
-    print(f"✓ agencies.csv saved ({len(agencies)} records)")
+    # print(f"✓ agencies.csv saved ({len(agencies)} records)")
     print(f"✓ appointments.csv saved ({len(appointments)} records)")
     print("\nDone!")
