@@ -51,34 +51,56 @@ See [db/README.md](db/README.md) for detailed database operations.
 
 #### 4. `data/`
 Local data storage organized by state abbreviation (e.g., `AK/`, `CA/`, `TX/`).
-## Naming Convention — IMPORTANT
+## Naming Convention
 
-The Firebase `db_launch` collection uses **full lowercase state names** as the
-identity key throughout the data pipeline:
+Two naming schemes coexist, and `db/state_names.py` bridges them.
 
-- Cleaned-CSV filename: `<full-state>_index.csv` (e.g. `california_index.csv`,
-  `georgia_index.csv` — **not** `ca_index.csv`).
-- `db/preprocess` derives the Firestore document prefix and the `state` field
-  from the directory name. So the source must live under
-  `states/<full-state>/<year>/` (e.g. `states/california/2026/`), and the
-  `*_index.csv` filename inside `output/` must also use the full state name.
-- This produces:
-  - Firestore prefix: `<full-state>-processed.csv` (e.g.
-    `california-processed.csv_0`, `california-processed.csv_1`, ...)
-  - `state` field on each doc: `"<full-state>"` (e.g. `"california"`)
-  - `document_id` field: `"<full-state>_<person_nbr>"`
-- The frontend (`npi-new/national-police-index/`) queries
-  `where state == "<full-state>"` and runs its post-upload pipeline with the
-  full state name (e.g. `npx tsx scripts/normalizeStateData.ts california`).
+**Two-letter codes** (`ca`, `ga`, `az`) are used for everything upstream of
+Firebase — Dropbox paths, `states/<state>/<year>/` directories, `*_index.csv`
+filenames, and `pipeline/data/registry.csv`.
 
-If you use a state abbreviation (e.g. `ca`) for the directory or filename,
-preprocess will silently produce a *different* prefix (`ca-processed.csv`)
-and `state="ca"` — the frontend will not see those docs, and you will end up
-with a parallel set of orphan documents in `db_launch`. Do not do this.
+**Full lowercase hyphenated names** (`california`, `new-mexico`) are the
+identity key for everything downstream of `db/preprocess`:
 
-`pipeline/data/registry.csv` separately uses lowercase abbreviations (`ca`,
-`ga`, `az`) for change-tracking — that file is independent of Firestore
-naming. Keep it as-is.
+- output path: `db/data/output/<full-state>/<full-state>-processed.csv.gz`
+- Firestore document prefix: `<full-state>-processed.csv` (e.g.
+  `california-processed.csv_0`, `california-processed.csv_1`, ...)
+- `state` field on each doc: `"<full-state>"` (e.g. `"california"`)
+- `document_id` field: `"<full-state>_<person_nbr>"`
+
+The front-end (`npi-new/national-police-index/`) queries
+`where state == "<full-state>"` and runs its post-upload pipeline with the
+full name (e.g. `npx tsx scripts/normalizeStateData.ts california`).
+
+`db/preprocess` and `db/upload` both resolve whatever you pass through
+`resolve_state_name()`, so either spelling works and both land on the same
+Firestore prefix:
+
+```bash
+cd db && make preprocess STATE=ca YEAR=2026          # ← code
+cd db && make preprocess STATE=california YEAR=2026  # ← full name
+# both write db/data/output/california/california-processed.csv.gz
+```
+
+An unrecognized state raises rather than passing through. That matters: before
+the resolver existed, running preprocess with `ca` silently produced a second
+prefix (`ca-processed.csv`, `state="ca"`) that the front-end could not see, and
+305,951 orphan documents had to be deleted from `db_launch` by hand. When you
+add a new state, add its code to `STATE_NAMES` in `db/state_names.py` — and
+keep it in sync with `constants/states.ts` (`abbreviation` → `reference`) in
+the front-end repo.
+
+### Contiguous stint collapsing
+
+Some states split one continuous term of employment across several adjacent
+rows. Those states are listed in `COLLAPSE_STINTS` at the top of
+`db/preprocess/src/src.py` (currently `california`), and their employment
+index is passed through `collapse_contiguous_stints` during preprocess.
+Discipline indexes are never collapsed — they are one row per violation.
+
+Add a state to that set only after confirming its source data actually has
+this shape; collapsing a state that reports genuine re-hires as separate rows
+would silently merge distinct periods of employment.
 
 ## Adding New Data
 
