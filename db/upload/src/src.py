@@ -16,6 +16,8 @@ import gzip
 import os
 import time
 
+from db.helpers.state_names import resolve_state_name
+
 
 # Firebase imports are deferred so --dry-run works without credentials
 _firebase_initialized = False
@@ -80,10 +82,40 @@ def check_state_exists(db, prefix):
 
 
 def delete_state_data(db, prefix):
-    print(f"  Deleting existing documents for prefix '{prefix}'...")
+    """Delete every document whose ID starts with ``prefix``.
+
+    Query and commit are both retried: a long delete reliably hits a 504
+    partway through, and a failure here aborts the upload that follows.
+    """
+    from google.api_core.exceptions import (
+        Aborted,
+        DeadlineExceeded,
+        ResourceExhausted,
+        ServiceUnavailable,
+    )
+    from tenacity import (
+        retry,
+        retry_if_exception_type,
+        stop_after_attempt,
+        wait_exponential,
+    )
+
+    transient = (
+        Aborted,
+        DeadlineExceeded,
+        ResourceExhausted,
+        ServiceUnavailable,
+    )
+    # Above Firestore's documented 500-write limit, but proven to work here,
+    # and each batch also sleeps 1s so smaller batches just run slower.
     batch_size = 1000
-    deleted = 0
-    while True:
+
+    @retry(
+        stop=stop_after_attempt(10),
+        wait=wait_exponential(multiplier=1, min=4, max=60),
+        retry=retry_if_exception_type(transient),
+    )
+    def next_page():
         query = (
             db.collection("db_launch")
             .order_by("__name__")
@@ -91,16 +123,47 @@ def delete_state_data(db, prefix):
             .end_at([prefix + "\uf8ff"])
             .limit(batch_size)
         )
-        docs = list(query.stream())
+        return list(query.stream())
+
+    @retry(
+        stop=stop_after_attempt(10),
+        wait=wait_exponential(multiplier=1, min=4, max=60),
+        retry=retry_if_exception_type(transient),
+    )
+    def commit_deletes(b):
+        b.commit()
+
+    print(f"  Deleting existing documents for prefix '{prefix}'...")
+    deleted = 0
+    while True:
+        docs = next_page()
         if not docs:
             break
         batch = db.batch()
         for doc in docs:
             batch.delete(doc.reference)
-            deleted += 1
-        batch.commit()
+        commit_deletes(batch)
+        deleted += len(docs)
+        if deleted % 10000 < batch_size:
+            print(f"    Deleted {deleted:,}...")
         time.sleep(1)
-    print(f"  Deleted {deleted} documents")
+    print(f"  Deleted {deleted:,} documents")
+    return deleted
+
+
+def count_state_data(db, prefix):
+    """Count documents under ``prefix``, or None if the aggregation fails."""
+    query = (
+        db.collection("db_launch")
+        .order_by("__name__")
+        .start_at([prefix])
+        .end_at([prefix + "\uf8ff"])
+    )
+    try:
+        return query.count().get()[0][0].value
+    except Exception as e:
+        print(f"  (count unavailable: {e})")
+        return None
 
 
 def upload_file(
@@ -136,8 +199,21 @@ def upload_file(
         b.commit()
 
     if force:
-        if check_state_exists(db, prefix):
-            delete_state_data(db, prefix)
+        # Not gated on check_state_exists(): that only probes `<prefix>_0`,
+        # which an interrupted delete removes first, leaving the rest behind.
+        before = count_state_data(db, prefix)
+        if before is not None:
+            print(f"  Existing documents under '{prefix}': {before:,}")
+        delete_state_data(db, prefix)
+        remaining = count_state_data(db, prefix)
+        if remaining:
+            raise RuntimeError(
+                f"Delete incomplete: {remaining:,} documents still under "
+                f"'{prefix}'. Re-run with --force before uploading — "
+                f"uploading now would leave stale rows behind."
+            )
+        if remaining == 0:
+            print("  Verified 0 documents remain")
     elif check_state_exists(db, prefix):
         print("  Skipping — data already exists (use --force to overwrite)")
         return "skipped"
@@ -169,7 +245,7 @@ def upload_file(
 def find_processed_files(input_dir, states=None):
     """
     Return list of (file_path, prefix) for all .csv.gz files found under input_dir.
-    Optionally filter to specific state directory names.
+    Optionally filter to specific states (``ca`` and ``california`` both match).
     """
     found = []
     if not os.path.exists(input_dir):
@@ -181,8 +257,8 @@ def find_processed_files(input_dir, states=None):
         if os.path.isdir(os.path.join(input_dir, d))
     ]
     if states:
-        states_lower = {s.lower() for s in states}
-        state_dirs = [d for d in state_dirs if d.lower() in states_lower]
+        wanted = {resolve_state_name(s) for s in states}
+        state_dirs = [d for d in state_dirs if d.lower() in wanted]
 
     for state_dir in state_dirs:
         dir_path = os.path.join(input_dir, state_dir)

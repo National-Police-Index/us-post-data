@@ -1,12 +1,12 @@
 """
 Preprocess cleaned state index CSVs for Firebase upload.
 
-Reads from automated_processing/data/output/<STATE>/
-Writes compressed .csv.gz to db/data/output/<STATE>/
+Reads from states/<state>/<year>/output/
+Writes compressed .csv.gz to db/data/output/<full-state>/
 
-Handles both employment and discipline index files:
-  <state>_index.csv              → <state>-processed.csv.gz
-  <state>-discipline_index.csv   → <state>-discipline-processed.csv.gz
+Output is keyed on the full state name (see db/helpers/state_names.py):
+  states/ca/2026/output/ca_index.csv
+      → db/data/output/california/california-processed.csv.gz
 """
 
 import argparse
@@ -16,6 +16,13 @@ import os
 
 import numpy as np
 import pandas as pd
+
+from db.helpers.state_names import resolve_state_name
+
+
+# States whose source data splits one continuous employment into adjacent
+# rows; contiguous stints at the same agency are merged before upload.
+COLLAPSE_STINTS = {"california"}
 
 
 def case_cols(df):
@@ -235,8 +242,8 @@ def collapse_contiguous_stints(
     return out.drop(["stint_id"], axis=1, inplace=False)
 
 
-def apply_transformations(df):
-    return (
+def apply_transformations(df, collapse_stints=False):
+    out = (
         df.pipe(clean_column_names)
         .pipe(case_cols)
         .pipe(clean_dates)
@@ -247,9 +254,19 @@ def apply_transformations(df):
         .pipe(check_required_columns)
         .pipe(sort_by_uid)
     )
+    if collapse_stints:
+        before = len(out)
+        out = collapse_contiguous_stints(out)
+        print(
+            f"  Collapsed contiguous stints: {before:,} → {len(out):,} rows "
+            f"({before - len(out):,} merged)"
+        )
+    return out
 
 
-def process_file(input_path, output_path, state_name, force=False):
+def process_file(
+    input_path, output_path, state_name, force=False, is_discipline=False
+):
     """Preprocess a single index CSV and write a compressed .csv.gz."""
     if os.path.exists(output_path) and not force:
         print(f"  Skipping (already exists): {os.path.basename(output_path)}")
@@ -259,11 +276,12 @@ def process_file(input_path, output_path, state_name, force=False):
         df = pd.read_csv(input_path, low_memory=False)
         print(f"  Read {len(df):,} rows from {os.path.basename(input_path)}")
 
-        df = apply_transformations(df)
+        # Discipline indexes are one row per violation; never collapse them.
+        collapse = state_name in COLLAPSE_STINTS and not is_discipline
+        df = apply_transformations(df, collapse_stints=collapse)
 
         # Attach state and document_id
-        formatted_state = state_name.lower().replace(" ", "-")
-        df["state"] = formatted_state
+        df["state"] = state_name
         df["person_nbr"] = df["person_nbr"].astype(str)
         df["document_id"] = df["state"] + "_" + df["person_nbr"]
 
@@ -280,31 +298,34 @@ def process_file(input_path, output_path, state_name, force=False):
 
 def find_index_files(input_dir, state_name, year):
     """
-    Return a list of (input_path, output_filename) tuples for all index CSVs
-    found in states/<STATE>/<YEAR>/output/.
+    Return (input_path, output_filename, is_discipline) for each *_index.csv
+    in states/<STATE>/<YEAR>/output/. Output names use the full state name:
 
-    Scans for any *_index.csv files rather than predicting names, so it works
-    regardless of whether the file uses the abbreviation (ga_index.csv) or the
-    full name (georgia_index.csv).
-
-      <stem>_index.csv  →  <stem>-processed.csv.gz
-
-    Output is written to db/data/output/<state>/ (no year — always latest).
+      ga_index.csv             →  georgia-processed.csv.gz
+      ga-discipline_index.csv  →  georgia-discipline-processed.csv.gz
     """
     output_dir = os.path.join(input_dir, state_name, year, "output")
     if not os.path.isdir(output_dir):
         return []
 
+    index_files = [
+        f for f in sorted(os.listdir(output_dir)) if f.endswith("_index.csv")
+    ]
+    if not index_files:
+        return []
+
+    # Resolve only when there is something to name, so states/helpers/ is
+    # skipped rather than raising.
+    canonical = resolve_state_name(state_name)
+
     found = []
-    for fname in sorted(os.listdir(output_dir)):
-        if not fname.endswith("_index.csv"):
-            continue
+    for fname in index_files:
         src_path = os.path.join(output_dir, fname)
-        # georgia_index.csv            → georgia-processed.csv.gz
-        # georgia-discipline_index.csv → georgia-discipline-processed.csv.gz
         stem = fname.replace("_index.csv", "")
-        dst_name = f"{stem}-processed.csv.gz"
-        found.append((src_path, dst_name))
+        is_discipline = stem.endswith("-discipline")
+        kind = "-discipline-processed" if is_discipline else "-processed"
+        dst_name = f"{canonical}{kind}.csv.gz"
+        found.append((src_path, dst_name, is_discipline))
     return found
 
 
@@ -356,6 +377,8 @@ def main():
     # Determine which states to process
     if args.states:
         state_dirs = args.states
+        for state in state_dirs:  # fail fast on an unknown state
+            resolve_state_name(state)
     else:
         state_dirs = [
             d
@@ -380,19 +403,26 @@ def main():
             results["skipped"].append(state)
             continue
 
-        state_output_dir = os.path.join(args.output_dir, state)
+        canonical = resolve_state_name(state)
+        if canonical != state:
+            print(f"  Resolved '{state}' → '{canonical}'")
+        state_output_dir = os.path.join(args.output_dir, canonical)
 
-        for input_path, output_name in files:
+        for input_path, output_name, is_discipline in files:
             output_path = os.path.join(state_output_dir, output_name)
             status = process_file(
-                input_path, output_path, state, force=args.force
+                input_path,
+                output_path,
+                canonical,
+                force=args.force,
+                is_discipline=is_discipline,
             )
             if status == "success":
-                results["success"].append(f"{state}/{output_name}")
+                results["success"].append(f"{canonical}/{output_name}")
             elif status == "skipped":
-                results["skipped"].append(f"{state}/{output_name}")
+                results["skipped"].append(f"{canonical}/{output_name}")
             else:
-                results["failed"].append(f"{state}/{output_name}")
+                results["failed"].append(f"{canonical}/{output_name}")
         print()
 
     print("=" * 50)

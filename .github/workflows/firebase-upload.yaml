@@ -35,9 +35,13 @@ jobs:
           git config user.name "github-actions[bot]"
 
       - name: Upload and mark registry
+        env:
+          PYTHONPATH: ${{ github.workspace }}
         run: |
           python - <<'EOF'
           import csv, os, subprocess, sys
+
+          from db.helpers.state_names import resolve_state_name
 
           registry_path = "pipeline/data/registry.csv"
 
@@ -59,16 +63,17 @@ jobs:
 
           uploaded = []
           for state, year in targets.items():
-              output_dir = os.path.join("db", "data", "output", state)
+              canonical = resolve_state_name(state)
+              output_dir = os.path.join("db", "data", "output", canonical)
               if not os.path.isdir(output_dir):
                   print(f"[{state}] No .csv.gz found in {output_dir} — skipping")
                   continue
-              print(f"Uploading {state} (year={year})...")
+              print(f"Uploading {state} -> {canonical} (year={year})...")
               result = subprocess.run(
                   [
                       "python3", "src/src.py",
                       "--input-dir", "../data/output",
-                      "--states", state,
+                      "--states", canonical,
                       "--force",
                       "--limit", "1000",
                   ],
