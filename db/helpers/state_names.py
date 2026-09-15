@@ -7,7 +7,6 @@ document prefix, ``state`` field, and front-end script argument.
 ``STATE_NAMES`` mirrors ``constants/states.ts`` in the front-end repo.
 """
 
-
 STATE_NAMES = {
     "al": "alabama",
     "ak": "alaska",
@@ -70,9 +69,9 @@ FULL_NAMES = frozenset(STATE_NAMES.values())
 def resolve_state_name(state):
     """Return the full state name for a code or full name; raise if unknown.
 
-        resolve_state_name("ca")          -> "california"
-        resolve_state_name("california")  -> "california"
-        resolve_state_name("new_mexico")  -> "new-mexico"
+    resolve_state_name("ca")          -> "california"
+    resolve_state_name("california")  -> "california"
+    resolve_state_name("new_mexico")  -> "new-mexico"
     """
     key = str(state).strip().lower().replace("_", "-").replace(" ", "-")
     if key in STATE_NAMES:

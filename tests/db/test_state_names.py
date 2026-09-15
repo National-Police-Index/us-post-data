@@ -45,9 +45,7 @@ def test_full_names_are_unique():
 
 def test_states_present_in_repo_are_mapped():
     """Every state directory under states/ must resolve."""
-    states_dir = os.path.join(
-        os.path.dirname(__file__), "..", "..", "states"
-    )
+    states_dir = os.path.join(os.path.dirname(__file__), "..", "..", "states")
     for entry in os.listdir(states_dir):
         if entry == "helpers" or not os.path.isdir(
             os.path.join(states_dir, entry)
