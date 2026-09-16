@@ -2,6 +2,9 @@ INPUT_DIR := ../data/output
 DELAY     := 5
 STATE     :=
 
+# Scripts import from db.helpers; that needs the repo root on the path.
+export PYTHONPATH := $(abspath ../..)
+
 .PHONY: dry-run run run-force
 
 # Default: dry run (safe — no Firebase credentials needed)

@@ -4,6 +4,9 @@ OUTPUT_DIR := ../data/output
 STATE :=
 YEAR  :=
 
+# Scripts import from db.helpers; that needs the repo root on the path.
+export PYTHONPATH := $(abspath ../..)
+
 .PHONY: run run-force clean setup
 
 run:
