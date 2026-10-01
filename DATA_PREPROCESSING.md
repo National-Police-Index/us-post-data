@@ -421,6 +421,112 @@ Drop these — they cannot be joined to other records or identified across updat
 
 ---
 
+## Incremental Releases: Appending New Data to a Prior Index
+
+Some states do not re-send their full history with each records request.
+Instead they send only the stints that *started* since the last request
+(e.g. Kansas sends one `Employment History` file per calendar year). The
+new files are therefore not a replacement for what is already in Firebase —
+uploading them alone would drop every earlier year. The cleaning script must
+rebuild a comprehensive index by appending the new rows to the previously
+cleaned index.
+
+### How to recognise it
+
+Before writing any code, check the `start_date` range of each new file and
+compare it with the prior index (`dropbox:national-post-db/<state>/output/`
+or the last `states/<state>/<year>/output/<state>_index.csv`):
+
+- New files cover only recent start dates (months or a few years) while the
+  prior index goes back decades → **incremental release, append**.
+- New files cover the same span as the prior index → **full refresh, replace**.
+- Row counts are a poor signal on their own; an incremental file for one
+  year can be larger than a small state's full history.
+
+### Procedure
+
+1. **Put the prior index in `data/input/`** alongside the new raw files and
+   treat it as an input, not something to hand-merge afterwards. The whole
+   rebuild must be reproducible from `clean.py`.
+
+2. **Find the overlap window.** The prior index was pulled on some date; the
+   new files usually start a little before that (the state's export window
+   rarely aligns with your last pull). Rows in that window exist in both
+   sources, and the *new* copy is more current — it has end dates that were
+   still open at the last pull. Determine the cut-off empirically:
+
+   ```python
+   old_sd = pd.to_datetime(old["start_date"])
+   new_sd = pd.to_datetime(new["start_date"])
+   print("old max start:", old_sd.max(), "| new min start:", new_sd.min())
+   # Confirm every old row in the window has a counterpart in new
+   window = old[old_sd >= new_sd.min()]
+   m = window.merge(new, on=["person_nbr", "agency_name", "start_date"],
+                    how="outer", indicator=True)
+   print(m["_merge"].value_counts())   # want no 'left_only'
+   ```
+
+   If every old row in the window matches a new row, drop the old rows from
+   the window and let the new file supply them. Hard-code the cut-off as a
+   named constant (`SUPERSEDE_FROM = "2024-11-01"`) and write the dropped
+   rows to a review file.
+
+3. **Normalise both sources with the same functions before concatenating.**
+   The prior index was cleaned under older rules — different rank codes,
+   agency spellings, name parsing. Run the old rows through the *current*
+   `clean_agency_name`, `clean_rank`, name parser, and date cleaner so the
+   result is internally consistent, rather than accepting its columns as-is.
+   Re-parse names from `full_name` for every row instead of trusting the
+   old `first_name`/`last_name` columns.
+
+4. **Deduplicate with a deterministic winner, not `keep="first"`.** The prior
+   index was itself often built by concatenating overlapping exports, so it
+   can contain the same stint twice (once open, once closed). Row order in a
+   CSV is not a recency signal. Pick the row to keep by an explicit rule —
+   latest `end_date` wins, closed beats open — and write every duplicate
+   group to a review file before resolving it:
+
+   ```python
+   key = ["person_nbr", "agency_name", "start_date"]
+   ordered = df.assign(_open=df["end_date"] == "").sort_values(
+       key + ["_open", "end_date"], ascending=[True, True, True, False, True]
+   )
+   df = ordered.drop_duplicates(subset=key, keep="last").drop(columns="_open")
+   ```
+
+5. **Check for stale open end dates across the seam.** An officer who was
+   "currently employed" in the prior index and then appears in the new file
+   at a different agency (or at the same agency after a promotion) still has
+   an open row from the old data. If the state splits stints on rank/status
+   changes, collapse contiguous rows per `(person_nbr, agency_name)` and
+   treat a non-final open row as ending when the next row starts (see
+   `clean/2026/KS/src/clean.py::collapse_contiguous_stints`). If the state
+   does not split stints, leave the rows alone — a genuine second job at a
+   different agency is not an error.
+
+6. **Do not naively `drop_duplicates()` on all columns and move on.** Inspect
+   what would be dropped first: group the duplicate candidates by which
+   source they came from and by which column differs. Exact duplicates across
+   files usually mean the files overlap and step 2 applies; rows that differ
+   only in `end_date` are step 4; rows that differ in `rank` at the same
+   agency are step 5.
+
+7. **Report the seam in the README.** Record the cut-off date, how many old
+   rows were superseded, how many duplicates were resolved, and the final
+   `start_date` range, so the next incremental release can be appended on top
+   of this one the same way.
+
+### Output naming
+
+The rebuilt index is the state's complete history and is written as the
+normal `<state>_index.csv`; the year directory reflects the release, not the
+data range. Preprocess and upload it exactly as a full refresh — it replaces
+the prior Firebase data for that state (`make force-upload STATE=<state>`).
+
+Worked example: `clean/2026/KS/` (README documents every decision).
+
+---
+
 ## Lessons from the Georgia Test Case
 
 These patterns were discovered during the first automated pipeline run and apply to any state, not just Georgia.
