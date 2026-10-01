@@ -14,4 +14,5 @@ dependencies = [
     "pandas>=2.2.3",
     "pre-commit>=4.1.0",
     "tenacity>=9.0.0",
+    "xlrd>=2.0.1",
 ]
