@@ -1,31 +1,45 @@
-# DATA_PREPROCESSING.md
+# DATA_PREPROCESSING_GUIDE.md
 
-This document is the authoritative guide for Claude agents and humans cleaning raw POST (Peace Officer Standards and Training) data for any U.S. state. It covers how to read raw downloads, produce a standardized output CSV, and pass it through the processing pipeline.
+Step by step guide for cleaning POST data for any state. This is a general guide, built by reviewing the all stats that were previouslyc leaned, that shouldn't be taken as an exact formula for cleaning because every state has it's own quirks.
+
+It is in three parts:
+
+| Part | Applies to | Contents |
+|---|---|---|
+| [Part 1 — Cleaning](#part-1--cleaning) | **everyone** (humans and agents) | Step-by-step: download the raw data, write `clean.py`, produce `<state>_index.csv` |
+| [Part 2 — Uploading](#part-2--uploading) | **everyone** | Preprocess, dry run, Firebase upload, front-end scripts |
+| [Part 3 — The automated agent pipeline](#part-3--the-automated-agent-pipeline) | **the CC agent only** | `validate.py`, the LLM-as-judge, ground truth, the `states/` layout |
+
+**If you are cleaning a state by hand, you only need Parts 1 and 2.**
+Part 3 describes machinery that exists for the automated pipeline; the LLM
+judge and ground-truth comparison are not required for manual work.
+
+### Where the work lives
+
+Manual cleaning lives in `clean/<year>/<STATE>/` (uppercase state code), one
+self-contained directory per release:
+
+```
+clean/<year>/<STATE>/
+├── README.md              ← document the source and every cleaning decision
+├── src/
+│   ├── download.py        ← fetch the raw data from Dropbox
+│   └── clean.py           ← produce the index
+└── data/
+    ├── input/             ← raw source files (read-only)
+    └── output/
+        ├── <state>_index.csv
+        └── review/        ← rows dropped or flagged, for audit
+```
+
+The automated pipeline uses a different layout, `states/<state>/<year>/`
+(lowercase) — see Part 3. This is a bug that needs to be fixed.
 
 ---
 
-## Overview of the Pipeline
+# Part 1 — Cleaning
 
-```
-Dropbox (raw state data)
-    ↓
-states/<state>/readme/                ← state-specific README files (read-only, when available)
-states/<state>/<year>/data/input/     ← raw input files (read-only)
-    ↓
-  [CC agent runs clean.py, reads this guide + state readme]
-    ↓
-states/<state>/<year>/output/         ← agent writes cleaned CSVs + judge reports here
-    ↓
-db/preprocess/                        ← normalizes + compresses to .csv.gz
-    ↓
-db/upload/ --dry-run                  ← validates manifest without writing to Firebase
-    ↓
-db/upload/                            ← live Firebase upload
-```
-
----
-
-## Output Schema
+## Output schema
 
 Every state must produce at least one CSV: `<state>_index.csv`. States with disciplinary records should also produce `<state>-discipline_index.csv`.
 
@@ -91,9 +105,42 @@ States that track disciplinary actions separately (currently: **GA**, **FL**) sh
 
 ---
 
-## Step-by-Step Cleaning Process
+---
+
+## Step-by-step cleaning process
+
+### Step 0: Write `download.py`
+
+**Every new state gets a `src/download.py`** so the raw data can be fetched
+again by anyone, and so the provenance of `data/input/` is recorded in code
+rather than in someone's browser history. Dropbox is the canonical source —
+upload the raw files there first if they are not already.
+
+Copy `clean/2026/KS/src/download.py` as the starting point. It:
+
+1. Takes a Dropbox shared link as a module-level constant.
+2. Rewrites the link's `dl=0` to `dl=1`, which makes Dropbox serve a shared
+   *folder* as a single zip.
+3. Streams the download to `data/input/` and extracts it in place.
+4. Checks the `Content-Type` and raises if the response is not a zip —
+   an expired or private link otherwise saves an HTML error page.
+
+```bash
+python src/download.py              # download + extract
+python src/download.py --keep-zip   # leave the archive in data/input/
+```
+
+For a link to a single file rather than a folder, skip the zip handling and
+stream the response straight to disk under its real filename.
+
+Always confirm the files you extracted are the ones you expect before
+cleaning: check the sheet names, row counts and column headers. A shared
+link can silently point at the wrong state's folder.
+
+---
 
 ### Step 1: Inventory the raw files
+
 
 Before writing any code, list all files in `data/input/` and identify:
 
@@ -351,7 +398,58 @@ discipline = discipline[discipline['start_date'].fillna('') != '']
 
 For cases where a person has multiple employment periods, score each period by how well the violation_date falls within it (exact match = 0, outside = 1+) and keep the best-scoring row.
 
-### Step 12: Validate output
+### Step 12: Collapse contiguous stints (when the state splits them)
+
+Many states close an employment row and open a new one whenever an
+officer's rank or employment status changes, so one continuous period of
+employment is spread across several adjacent rows. **If the source behaves
+that way, collapse those rows into a single stint in `clean.py`.**
+
+Check before deciding:
+
+```python
+w = df.sort_values(["person_nbr", "agency_name", "start_date"])
+prev_end = w.groupby(["person_nbr", "agency_name"])["end_date"].transform(
+    lambda s: s.cummax().shift(1)
+)
+print("rows contiguous with the previous stint:",
+      ((pd.to_datetime(w.start_date) - pd.to_datetime(prev_end))
+       <= pd.Timedelta(days=1)).sum())
+```
+
+If the count is material, and the adjacent rows differ only in `rank`,
+`employment_status` or similar, collapse. If the state reports genuine
+re-hires as separate rows with real gaps between them, do not — merging
+them would silently join distinct periods of employment.
+
+Model the implementation on `collapse_contiguous_stints` in
+`db/preprocess/src/src.py`. Group by `(person_nbr, agency_name)`, sort by
+start date, and start a new stint when the next start is more than a day
+after the latest end seen so far. The merged row takes the earliest start,
+the latest end, and every other field from the most recent member.
+
+Two refinements worth copying from `clean/2026/IL/src/clean.py`:
+
+- **An open end date mid-sequence is stale.** If a row has an empty
+  `end_date` but is followed by another row at the same agency, the state
+  never closed it; treat it as ending when the next row starts. Only a
+  genuinely final open row should keep the stint open.
+- **Fall back for empty fields.** Taking the most recent row wholesale can
+  pick up an empty `separation_reason`; fall back to the latest non-empty
+  value in the group.
+
+**Collapsing flattens rank history** — a promotion recorded as two adjacent
+rows becomes one stint carrying the later rank. That is the intended
+trade-off, but say so in the state's README.
+
+Collapsing can also happen downstream instead, for states listed in
+`COLLAPSE_STINTS` at the top of `db/preprocess/src/src.py`. **Do not do
+both.** If `clean.py` collapses, leave the state out of that set. Discipline
+indexes are never collapsed — they are one row per violation.
+
+---
+
+### Step 13: Validate output
 
 Before writing to disk, check:
 
@@ -369,7 +467,7 @@ for col, count in empty_required.items():
 assert (df['start_date'] != '').all(), "start_date must not be empty"
 ```
 
-### Step 13: Write output
+### Step 14: Write output
 
 ```python
 import argparse, os
@@ -392,7 +490,9 @@ discipline_df.to_csv(
 
 ---
 
-## Common Pitfalls
+---
+
+## Common pitfalls
 
 ### Date `0000-00-00`
 Georgia and some other states use `0000-00-00` to represent a missing or open-ended date. Treat this as empty (currently employed for `end_date`, invalid for `start_date`).
@@ -421,7 +521,7 @@ Drop these — they cannot be joined to other records or identified across updat
 
 ---
 
-## Incremental Releases: Appending New Data to a Prior Index
+## Incremental releases: appending new data to a prior index
 
 Some states do not re-send their full history with each records request.
 Instead they send only the stints that *started* since the last request
@@ -435,7 +535,7 @@ cleaned index.
 
 Before writing any code, check the `start_date` range of each new file and
 compare it with the prior index (`dropbox:national-post-db/<state>/output/`
-or the last `states/<state>/<year>/output/<state>_index.csv`):
+or the last `<state>_index.csv` you produced):
 
 - New files cover only recent start dates (months or a few years) while the
   prior index goes back decades → **incremental release, append**.
@@ -527,7 +627,9 @@ Worked example: `clean/2026/KS/` (README documents every decision).
 
 ---
 
-## Lessons from the Georgia Test Case
+---
+
+## Lessons from the Georgia test case
 
 These patterns were discovered during the first automated pipeline run and apply to any state, not just Georgia.
 
@@ -548,34 +650,125 @@ After joining discipline records to the employment table for context, some offic
 ### Suffix casing in full_name
 The `suffix` column from demographics tables is often sparsely populated (7–8% fill rate in Georgia). Include it in `full_name` when present: `"smith, john a jr"`. The preprocess pipeline will proper-case the suffix column (`jr` → `Jr`), so leave it lowercase in the cleaning script output.
 
-### Row count differences against reference outputs
-Reference outputs in `states/<state>/<year>/data/groundtruth/` are point-in-time snapshots. As Dropbox data is updated, row counts will drift — expect ±5% for employment indexes and larger variation for discipline indexes if data coverage has grown. The LLM-as-judge test WARNs but does not fail on row count differences above 5%.
+---
+
+# Part 2 — Uploading
+
+Applies to manual and automated work alike.
+
+### Step 1: Put the index where `db/preprocess` looks for it
+
+`db/preprocess` reads `states/<state>/<year>/output/*_index.csv` (lowercase
+state code). Manual cleaning writes to `clean/<year>/<STATE>/data/output/`,
+so copy the index across:
+
+```bash
+mkdir -p states/<state>/<year>/output
+cp clean/<year>/<STATE>/data/output/<state>_index.csv \
+   states/<state>/<year>/output/
+```
+
+### Step 2: Preprocess and dry run
+
+```bash
+cd db && make dry-run STATE=<state> YEAR=<year>
+```
+
+This normalizes the data, writes
+`db/data/output/<full-state>/<full-state>-processed.csv.gz`, and prints the
+upload manifest without writing to Firebase. Read the output: it reports row
+counts and warns about empty values in required columns.
+
+Preprocess applies its own transformations on top of your cleaning —
+lowercasing, agency abbreviation expansion, proper-casing, dropping rows
+with an empty `start_date`, filtering `withheld` names, and adding the
+`state` and `document_id` fields. Do not duplicate that work in `clean.py`.
+
+### Step 3: Upload
+
+```bash
+cd db && make upload STATE=<state> YEAR=<year>        # first time
+cd db && make force-upload STATE=<state> YEAR=<year>  # replacing existing data
+```
+
+Use `force-upload` when the state is already in Firebase — it deletes the
+existing documents first. A plain `upload` over existing data leaves stale
+rows behind.
+
+### Step 4: Run the front-end scripts
+
+From the front-end repo, in order:
+
+```bash
+npx tsx scripts/normalizeStateData.ts <full-state>
+npx tsx scripts/normalizeDatesByState.ts <full-state>
+npx tsx scripts/addSearchQueriesByState.ts <full-state>
+npx tsx scripts/generateStateStats.ts <full-state>
+npx tsx scripts/generateAgencyStats.ts <full-state>
+```
+
+### State naming
+
+Two schemes coexist and `db/helpers/state_names.py` bridges them:
+two-letter codes (`ks`, `il`) upstream of Firebase, full hyphenated names
+(`kansas`, `illinois`) downstream. `make` accepts either. When adding a new
+state, add its code to `STATE_NAMES` and keep it in sync with
+`constants/states.ts` in the front-end repo. See the repo `README.md` for
+the full explanation and the orphan-document incident that motivated it.
 
 ---
 
-## Running the Pipeline After Cleaning
+# Part 3 — The automated agent pipeline
 
-Once the cleaned CSV(s) are in `states/<state>/<year>/output/`:
+**This part applies only to the CC agent** (`pipeline/cc_agent.py`), which
+writes cleaning scripts unattended and needs a machine-readable way to judge
+its own output. Humans cleaning a state by hand can stop at Part 2.
 
-```bash
-# Run LLM-as-judge validation
-# (writes states/<state>/<year>/output/judge_report.md + judge_report.json)
-cd states/<state>/<year>/ && python src/validate.py
+### Layout
 
-# Dry run: preprocess + print upload manifest without writing to Firebase
-cd db && make dry-run STATE=<STATE>
+The agent works in `states/<state>/<year>/` (lowercase state code), which
+`pipeline/rclone_client.py` populates from Dropbox:
 
-# Live upload (when ready)
-cd db && make upload STATE=<STATE>
+```
+states/<state>/<year>/
+├── data/
+│   ├── input/        ← raw files from Dropbox (read-only)
+│   └── groundtruth/  ← reference outputs, when available (read-only)
+├── output/           ← cleaned CSVs + judge reports
+└── src/
+    ├── clean.py
+    └── validate.py   ← LLM-as-judge test suite
 ```
 
-See `db/README.md` for full pipeline documentation.
+The agent reads `readmes/<STATE>_README.md` first when one exists.
 
-### Ground truth and the validation script
+### Running validation
 
-`validate.py` gracefully degrades based on what's available:
+```bash
+cd states/<state>/<year>/ && python src/validate.py
+```
 
-- **With `data/groundtruth/`**: runs full comparison checks including LLM row-count comparison and side-by-side agency/name scoring against reference.
-- **Without `data/groundtruth/`**: skips comparison checks and runs schema, date format, and `person_nbr` format checks only. The LLM still evaluates agency name and name parsing quality against general best-practice criteria.
+Writes `output/judge_report.md` (human-readable) and `output/judge_report.json`
+(`{"overall": "PASS|WARN|FAIL", "has_groundtruth": true|false}`). The report
+must be PASS or WARN for the pipeline to accept the run.
 
-Ground truth is only expected for states that have been manually validated. New states will not have it — that is expected and not an error.
+### Ground truth
+
+`validate.py` degrades gracefully based on what is available:
+
+- **With `data/groundtruth/`**: full comparison checks, including LLM
+  row-count comparison and side-by-side agency/name scoring against the
+  reference.
+- **Without it**: schema, date-format and `person_nbr` checks only. The LLM
+  still scores agency-name and name-parsing quality against general
+  best-practice criteria.
+
+Ground truth exists only for states that have been manually validated. A new
+state will not have it — that is expected, not an error.
+
+### Row-count drift against reference outputs
+
+Reference outputs in `data/groundtruth/` are point-in-time snapshots. As
+Dropbox data is updated, row counts drift — expect ±5% for employment
+indexes, and more for discipline indexes if coverage has grown. The judge
+WARNs but does not fail above 5%.

@@ -1,6 +1,6 @@
 # State Processing — Agent Instructions
 
-**Before doing anything else, read [`DATA_PREPROCESSING.md`](DATA_PREPROCESSING.md)
+**Before doing anything else, read [`DATA_PREPROCESSING_GUIDE.md`](DATA_PREPROCESSING_GUIDE.md)
 in full.** It is the authoritative schema definition, step-by-step cleaning
 process, common pitfalls, and code patterns. This file only tells you *what*
 to process and *where* files live.
@@ -35,7 +35,7 @@ states/
 If `readmes/<STATE>_README.md` exists (e.g. `readmes/CA_README.md`),
 **read it before writing `clean.py`**. It provides state-specific context
 about the raw data format, column names, file layout, and known quirks that
-supplements `DATA_PREPROCESSING.md`.
+supplements `DATA_PREPROCESSING_GUIDE.md`.
 
 ---
 
@@ -67,7 +67,7 @@ Write `states/<state>/<year>/src/clean.py` that:
 
 1. Accepts `--input-dir` and `--output-dir` CLI args
 2. Reads from the path given by `--input-dir`
-3. Performs all cleaning (see `DATA_PREPROCESSING.md`)
+3. Performs all cleaning (see `DATA_PREPROCESSING_GUIDE.md`)
 4. Writes output to the path given by `--output-dir`
 
 Run it from `states/<state>/<year>/` as cwd:
