@@ -1,6 +1,6 @@
-# DATA_PREPROCESSING.md
+# DATA_PREPROCESSING_GUIDE.md
 
-Step by step guide for cleaning POST data for any state. This is a general guide, built by reviewing the all stats that were previouslyc leaned, that shouldn't be taken as an exact formula for cleaning because every state has it's own quirks.  
+Step by step guide for cleaning POST data for any state. This is a general guide, built by reviewing the all stats that were previouslyc leaned, that shouldn't be taken as an exact formula for cleaning because every state has it's own quirks.
 
 It is in three parts:
 
@@ -33,7 +33,7 @@ clean/<year>/<STATE>/
 ```
 
 The automated pipeline uses a different layout, `states/<state>/<year>/`
-(lowercase) — see Part 3. This is a bug that needs to be fixed. 
+(lowercase) — see Part 3. This is a bug that needs to be fixed.
 
 ---
 

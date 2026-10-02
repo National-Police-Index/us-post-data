@@ -91,7 +91,7 @@ State codes are **lowercase everywhere** (dirs, rclone paths, registry). Each `(
 - **`states/<state>/<year>/src/validate.py`** — LLM-as-judge test suite. Writes `output/judge_report.md` + `output/judge_report.json`.
 - **`states/<state>/<year>/output/`** — Cleaned CSVs and judge reports. Consumed by `db/preprocess/`.
 - **`AGENT_INSTRUCTIONS.md`** — Brief for Claude agents processing a new state (repo root).
-- **`DATA_PREPROCESSING.md`** — Authoritative cleaning guide for agents and humans.
+- **`DATA_PREPROCESSING_GUIDE.md`** — Authoritative cleaning guide for agents and humans.
 - **`states/helpers/llm_models.py`** — Azure OpenAI wrapper used by validate.py.
 - **`db/preprocess/`** — Normalizes all states' data: standardizes dates, expands agency abbreviations, proper-cases names, filters anonymous records. Writes `.csv.gz`.
 - **`db/upload/`** — Uploads compressed `.csv.gz` to Firebase Firestore collection `db_launch`. Supports `--dry-run`.
@@ -128,7 +128,7 @@ The `document_id` field (`<state>_<person_nbr>`) and `state` field are added by 
 
 1. Place raw Dropbox files in `states/<state>/<year>/data/input/`
 2. Place any reference/ground-truth CSVs in `states/<state>/<year>/data/groundtruth/`
-3. Write `states/<state>/<year>/src/clean.py` following `DATA_PREPROCESSING.md`
+3. Write `states/<state>/<year>/src/clean.py` following `DATA_PREPROCESSING_GUIDE.md`
 4. Run from `states/<state>/<year>/`: `python src/clean.py --input-dir data/input --output-dir output`
 5. Run `python src/validate.py` — review `output/judge_report.md`
 6. Run `cd db && make dry-run STATE=<STATE>` to validate the full pipeline

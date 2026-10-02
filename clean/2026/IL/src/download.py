@@ -18,9 +18,7 @@ from urllib.parse import parse_qs, urlencode, urlsplit, urlunsplit
 import requests
 
 
-DROPBOX_URL = (
-"https://www.dropbox.com/scl/fi/w6u2eueopdqj9e1gg8ih1/26-327.xlsx?rlkey=wpk9z2mzkt86asfvjdpalgqbr&st=kglgtf91&dl=0"
-)
+DROPBOX_URL = "https://www.dropbox.com/scl/fi/w6u2eueopdqj9e1gg8ih1/26-327.xlsx?rlkey=wpk9z2mzkt86asfvjdpalgqbr&st=kglgtf91&dl=0"
 
 logging.basicConfig(level=logging.INFO, format="%(levelname)s %(message)s")
 logger = logging.getLogger(__name__)

@@ -198,7 +198,7 @@ class CCAgent:
             else ""
         )
         base = (
-            f"Read AGENT_INSTRUCTIONS.md and DATA_PREPROCESSING.md, "
+            f"Read AGENT_INSTRUCTIONS.md and DATA_PREPROCESSING_GUIDE.md, "
             f"then immediately start writing code. "
             f"Process state {state}, year {year}.\n\n"
             f"{readme_note}"
