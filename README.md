@@ -152,7 +152,7 @@ raw data preserved in Dropbox for future runs.
    "
    ```
 3. **Write the cleaning script** at `states/<state>/<year>/src/clean.py`
-   following [DATA_PREPROCESSING.md](DATA_PREPROCESSING.md). Also write
+   following [DATA_PREPROCESSING_GUIDE.md](DATA_PREPROCESSING_GUIDE.md). Also write
    `states/<state>/<year>/src/validate.py` (LLM-as-judge).
 4. **Run cleaning + validation** from the state/year directory:
    ```bash
