@@ -35,6 +35,7 @@ import re
 
 import pandas as pd
 
+
 # }}}
 # {{{ constants
 
@@ -166,7 +167,6 @@ def normalize(df):
         .str.strip()
     )
     return df
-
 
 
 def resolve_duplicates(df, review_dir):
