@@ -18,7 +18,7 @@ from urllib.parse import parse_qs, urlencode, urlsplit, urlunsplit
 import requests
 
 
-DROPBOX_URL = "" #udpate with OH url 
+DROPBOX_URL = ""  # udpate with OH url
 
 logging.basicConfig(level=logging.INFO, format="%(levelname)s %(message)s")
 logger = logging.getLogger(__name__)
@@ -71,7 +71,7 @@ def main():
     parser.add_argument("--keep-zip", action="store_true")
     args = parser.parse_args()
 
-    zip_path = os.path.join(args.input_dir, "") # name appropriately
+    zip_path = os.path.join(args.input_dir, "")  # name appropriately
     os.makedirs(os.path.dirname(zip_path), exist_ok=True)
 
     download(force_direct_download(args.url), zip_path)
