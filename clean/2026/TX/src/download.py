@@ -18,9 +18,7 @@ from urllib.parse import parse_qs, urlencode, urlsplit, urlunsplit
 import requests
 
 
-DROPBOX_URL = (
-    "" # replace with correct url 
-)
+DROPBOX_URL = ""  # replace with correct url
 
 logging.basicConfig(level=logging.INFO, format="%(levelname)s %(message)s")
 logger = logging.getLogger(__name__)
