@@ -1,10 +1,10 @@
-"""Download the KS 2026 raw data from a Dropbox shared-folder link.
+"""Download the OH 2026 raw data from a Dropbox shared-folder link.
 
 Dropbox serves a shared folder as a single zip when the link's ``dl``
 parameter is ``1``. This script streams that zip to ``data/input/`` and
 extracts it in place so ``clean.py`` can read the raw files.
 
-Usage (from clean/2026/KS/):
+Usage (from clean/2026/OH/):
     python src/download.py                  # download + extract
     python src/download.py --keep-zip       # leave the zip in data/input/
 """
@@ -18,7 +18,7 @@ from urllib.parse import parse_qs, urlencode, urlsplit, urlunsplit
 import requests
 
 
-DROPBOX_URL = "https://www.dropbox.com/scl/fi/w6u2eueopdqj9e1gg8ih1/26-327.xlsx?rlkey=wpk9z2mzkt86asfvjdpalgqbr&st=kglgtf91&dl=0"
+DROPBOX_URL = ""  # udpate with OH url
 
 logging.basicConfig(level=logging.INFO, format="%(levelname)s %(message)s")
 logger = logging.getLogger(__name__)
@@ -71,7 +71,7 @@ def main():
     parser.add_argument("--keep-zip", action="store_true")
     args = parser.parse_args()
 
-    zip_path = os.path.join(args.input_dir, "ks-2026.zip")
+    zip_path = os.path.join(args.input_dir, "")  # name appropriately
     os.makedirs(os.path.dirname(zip_path), exist_ok=True)
 
     download(force_direct_download(args.url), zip_path)
