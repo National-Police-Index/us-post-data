@@ -18,9 +18,8 @@ from urllib.parse import parse_qs, urlencode, urlsplit, urlunsplit
 import requests
 
 
-DROPBOX_URL = (
-    "https://www.dropbox.com/scl/fo/ar3o35uzdatzqj7ub58uz/APKdMjUyyaTLLPXTNOW5K9w/FDLE?rlkey=9olbopzl9ylnuwc2ksmmfjdqs&subfolder_nav_tracking=1&e=1&st=jz4g3yes&dl=0"
-)
+# need a public url
+DROPBOX_URL = "https://www.dropbox.com/scl/fo/ar3o35uzdatzqj7ub58uz/APKdMjUyyaTLLPXTNOW5K9w/FDLE?rlkey=9olbopzl9ylnuwc2ksmmfjdqs&subfolder_nav_tracking=1&e=1&st=jz4g3yes&dl=1"
 
 logging.basicConfig(level=logging.INFO, format="%(levelname)s %(message)s")
 logger = logging.getLogger(__name__)

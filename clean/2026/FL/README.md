@@ -43,8 +43,18 @@ The 2023 release was cleaned by CBS News in R (`readmes/FL_README.md`,
 Run from `clean/2026/FL/`:
 
 ```bash
+# 1. Download the raw tables into data/input/ (see note below).
+python src/download.py
+
+# 2. Clean.
 python src/clean.py --input-dir data/input --output-dir data/output
 ```
+
+**`src/download.py` does not work yet.** The Dropbox link in
+`DROPBOX_URL` is restricted, so anyone not signed in gets Dropbox's "No
+Access" page instead of the zip. It needs to be replaced with a public link
+("Anyone with the link"). Until then, place the CSVs in `data/input/` by
+hand.
 
 Takes about 1 minute. It writes `data/output/fl_index.csv`,
 `data/output/fl-discipline_index.csv` and audit files in
