@@ -1,6 +1,10 @@
 # DATA_PREPROCESSING_GUIDE.md
 
-Step by step guide for cleaning POST data for any state. This is a general guide, built by reviewing the all stats that were previouslyc leaned, that shouldn't be taken as an exact formula for cleaning because every state has it's own quirks.
+Step by step guide for cleaning POST data for any state. It was built by
+reviewing every state cleaned so far. It is not an exact formula, because
+every state has its own quirks, but **every item in the
+[checklist](#checklist-required-for-every-state) is required.** Start
+there, then use the detailed steps and examples below it.
 
 It is in three parts:
 
@@ -34,6 +38,121 @@ clean/<year>/<STATE>/
 
 The automated pipeline uses a different layout, `states/<state>/<year>/`
 (lowercase) — see Part 3. This is a bug that needs to be fixed.
+
+---
+
+## Checklist (required for every state)
+
+Work through this list in order. A state is not done until every box is
+ticked. Each item links to the step that explains it, with examples.
+
+**Setup**
+
+- [ ] `src/download.py` exists, copied from the KS template. If there is
+  no public Dropbox link yet, leave `DROPBOX_URL = ""` with a TODO and say
+  so in the README. ([Step 0](#step-0-write-downloadpy))
+- [ ] Every raw file has been inventoried: sheets, row counts, headers, and
+  which files are used or not used. ([Step 1](#step-1-inventory-the-raw-files))
+- [ ] The old cleaning for this state has been read:
+  `readmes/<STATE>_README.md` and `clean_deprecated/src/<STATE>/`. So have
+  the most recent `clean/<year>/*/src/clean.py` scripts, for conventions.
+
+**Cleaning (`src/clean.py`)**
+
+- [ ] Written in the [house style](#how-to-write-cleanpy): small helper
+  functions chained with `.pipe`, and no module-level constants.
+- [ ] The data is one row per stint (reshaped from wide format if
+  necessary). ([Step 10](#step-10-handle-wide-to-long-reshaping))
+- [ ] Columns are renamed to the schema, and every **coded value is
+  decoded** from the source's code table, if there is one.
+  ([Step 4](#step-4-rename-columns-to-schema-names))
+- [ ] `person_nbr` is a lowercase string. ([Step 5](#step-5-clean-person_nbr))
+- [ ] Names are split and suffixes pulled out, and `full_name` is built.
+  ([Step 6](#step-6-parse-and-clean-names))
+- [ ] Dates are `YYYY-MM-DD`. **Two-digit years** get an explicit century,
+  and **placeholder dates** (`1900/1901-01-01`, `0000-00-00`, `1/1/0001`)
+  are blanked. ([Step 7](#step-7-clean-dates))
+- [ ] **Agency names**: the full list of unique names has been read, not
+  sampled. Codes and noise are stripped, abbreviations and acronyms
+  expanded, variants and redirects merged, and non-agency values dropped to
+  review. ([Step 8](#step-8-clean-agency-names))
+- [ ] Ranks are cleaned and placeholder values (`Unknown`) cleared.
+  ([Step 9](#step-9-clean-ranks))
+- [ ] Duplicates are resolved, and a decision on collapsing contiguous
+  stints has been made and justified with counts.
+  ([Step 12](#step-12-collapse-contiguous-stints-when-the-state-splits-them))
+- [ ] The discipline index, if the state has one, has one row per incident
+  (no double counting) and is attached to a stint.
+  ([Step 11](#step-11-handle-discipline-data))
+- [ ] **Every dropped row goes to `data/output/review/`.** The script
+  prints the counts. ([Step 13](#step-13-validate-output))
+- [ ] Rows with an empty `start_date` are dropped here (preprocess would
+  drop them anyway). The README reports the **rows, unique people, and
+  people who leave the index entirely**. ([Step 13](#step-13-validate-output))
+- [ ] The validation asserts pass, and the output is
+  `data/output/<state>_index.csv`. ([Step 14](#step-14-write-output))
+
+**Finish**
+
+- [ ] `README.md` documents the source, every file, every cleaning step
+  with counts, the output columns, what was deliberately not cleaned, and
+  open questions. ([Step 15](#step-15-readme-and-lint))
+- [ ] `make lint` has been run until every hook passes, including on
+  notebooks. ([Step 15](#step-15-readme-and-lint))
+
+---
+
+## How to write `clean.py`
+
+Follow the shape of `clean/2026/FL/src/clean.py` and
+`clean/2026/WA/src/clean.py`:
+
+- **Small helper functions, not globals.** Each cleaning step is a function
+  that takes a DataFrame and returns it: `clean_race(df)`,
+  `clean_dates(df)`, `split_suffixes(df)`. Lookup tables, regex lists and
+  mappings live **inside the function that uses them**, not as module-level
+  constants. The only things at module level are imports, functions and
+  `if __name__ == "__main__": main()`.
+- **Chain them with `.pipe`.** A `build_<index>()` or `main()` function
+  reads as the list of steps.
+- **Extra arguments go through `.pipe`:** `df.pipe(clean_race, codes)`, or
+  `df.pipe(drop_bad_dates, review_dir)` for steps that write review files.
+- **One helper for review files.** A `write_review(df, review_dir, fname,
+  label)` writes every dropped or flagged set and prints its count.
+- **Plain section comments.** Use a single line such as `# helpers`,
+  `# employment history data`, `# complaint data`, `# main`. Don't use
+  banner blocks of dashes.
+- **Short docstrings.** Two sentences at most, saying what the function
+  does. The reasoning and the counts belong in the README.
+- **`argparse` with `--input-dir data/input` and
+  `--output-dir data/output`** as defaults, run from `clean/<year>/<STATE>/`.
+
+```python
+# employment history data
+
+
+def clean_sex(df, codes):
+    """Decode sex_code; Unknown and undefined values are left empty."""
+    sex = decode(df.sex_code, codes, "sex")
+    df.loc[:, "sex"] = sex.where(sex.isin(["Male", "Female"]), "")
+    return df
+
+
+def drop_bad_dates(df, review_dir):
+    bad = df._start.isna() | (df._end < df._start)
+    write_review(df[bad], review_dir, "end_before_start.csv", "Bad dates")
+    return df[~bad]
+
+
+def build_employment(df, codes, review_dir):
+    return (
+        df.pipe(rename_cols)
+        .pipe(clean_dates)
+        .pipe(clean_sex, codes)
+        .pipe(drop_bad_dates, review_dir)
+        .pipe(collapse_stints, review_dir)
+    )
+```
 
 ---
 
@@ -201,6 +320,23 @@ df.rename(columns={
 }, inplace=True)
 ```
 
+**Decode every coded value.** Relational exports usually ship a code table
+(FL's `codes.csv` has `category`, `code_value`, `code_description`). Decode
+race, sex, employment type and class, separation reason, offense and
+sanction from it. Don't hardcode mappings from memory, and don't blank a
+code you don't recognise without checking the table first. FL's race code
+`NA` looked like "missing" but is defined as "American Indian/Native
+Alaskan". Match case-insensitively (`Wh`/`WH`/`wh`), and keep unknown codes
+as-is.
+
+```python
+def decode(series, codes, category):
+    """Map codes to their description; unknown codes are kept as-is."""
+    sub = codes[codes.category == category]
+    lookup = dict(zip(sub.code_value.str.lower(), sub.code_description))
+    return series.map(lambda v: lookup.get(v.lower(), v))
+```
+
 ### Step 5: Clean person_nbr
 
 ```python
@@ -263,9 +399,57 @@ df['end_date'] = df['end_date'].apply(safe_date)
 
 **Records with an empty `start_date` will be dropped by the preprocess pipeline.** If there are many such records, investigate whether the source data stores dates in a non-standard field.
 
+**Two-digit years need an explicit century.** pandas puts `00–68` in the
+2000s, so `4/8/68` becomes 2068. Find the latest real date in the export
+and split on it: TX and FL both end in 2025 and have no year `26`, so
+`00–25` → 20xx and `26–99` → 19xx. Birth years need their own rule: TX
+uses 20xx unless that would make the officer younger than 14 at their
+first appointment. See `parse_mdy` in `clean/2026/TX/src/clean.py` and
+`parse_dates` in `clean/2026/FL/src/clean.py`.
+
+**Placeholder dates.** Look at the year distribution, not just the
+min/max. A spike on one date is a placeholder for "unknown"; blank it.
+Known ones:
+
+| State | Placeholder | Meaning |
+|---|---|---|
+| GA | `0000-00-00` | missing / open |
+| KS | `1/1/0001` | no end date (still employed) |
+| IL | `1900/1901/1902-01-01` hire dates | unknown hire date |
+| WA | `1901-01-01` (once `1900-01-01`) | unknown, on 20% of stints |
+
+Also check for **future-dated** rows past the export date. In WA these
+were real scheduled academy starts and retirements, so they were kept and
+noted.
+
 ### Step 8: Clean agency names
 
-This is the most state-specific step. Agency names in raw data often contain:
+This is the most state-specific step, and it is required even when the
+names look clean. **Start by reading the full list of unique names with
+their row counts**, not a sample. Then look specifically for:
+
+- **Acronyms and abbreviations**: count the short tokens across all names
+  to find them (WA: `WSCJTC`, `WSP`, `JRA`, `UW`, `HIDTA`, `NW`; FL: `Dc,`,
+  `Dep,`, `Fdle`, `Svcs`, `Afb`; TX: `co.`, `pct.`, `i.s.d.`).
+- **Truncation**: check the maximum name length. FL's names are cut at 60
+  characters (`…Investigations Di` → `Division`).
+- **Variants of one agency**: normalize punctuation and legal suffixes
+  (`LLC`, `Inc.`) and look for collisions (WA: `A1` / `A-1 Security
+  Services`).
+- **Redirects**: one agency recorded under another's name (WA:
+  `Allied Protection Services, Inc. (Use Allied Universal Security
+  Services)`).
+- **Non-agency values**: `Other`, `Unknown`, `Application Denied`, test
+  agencies (FL: `Fdle Fake Training Center`). Drop these to review.
+- **What not to touch**: real hyphenated names (`Sedro-Woolley`), meaningful
+  parentheses (`(Self)`, `(ID)`), place names (`St. Petersburg`). Re-read
+  the list after applying rules; a broad regex will break these.
+
+Put the rules in a list **inside** `clean_agency_names` and document each
+one in the README. Worked examples: `clean_agency_names` in the TX, FL and
+WA `clean.py`.
+
+Agency names in raw data often contain:
 - **Agency code prefixes**: `"G1720 DEKALB COUNTY POLICE DEPARTMENT"` → strip the leading code
 - **Abbreviations**: `"DEPT"`, `"SO"`, `"PD"`, `"CO"` — expand them
 - **Trailing noise**: `"/INACTIVE"`, `"(CLOSED)"` — strip these
@@ -398,6 +582,19 @@ discipline = discipline[discipline['start_date'].fillna('') != '']
 
 For cases where a person has multiple employment periods, score each period by how well the violation_date falls within it (exact match = 0, outside = 1+) and keep the best-scoring row.
 
+If the complaint table records the **agency and employment start date**
+the case was opened against (FL does), match on those first. That is far
+more precise than date-window scoring.
+
+**Deduplicate per incident, not just per case.** Some states open a
+separate case for the same incident, e.g. one per certificate or per
+agency. Such cases share the person, violation, sanction and sanction date
+but have a different `case_id`, and counting each overstates misconduct.
+After attaching stints, keep one row per `(person_nbr, violation,
+sanction, sanction_date)`, and write the rest to
+`review/duplicate_incidents.csv`. See `drop_duplicate_incidents` in
+`clean/2026/FL/src/clean.py`.
+
 ### Step 12: Collapse contiguous stints (when the state splits them)
 
 Many states close an employment row and open a new one whenever an
@@ -422,21 +619,30 @@ If the count is material, and the adjacent rows differ only in `rank`,
 re-hires as separate rows with real gaps between them, do not — merging
 them would silently join distinct periods of employment.
 
-Model the implementation on `collapse_contiguous_stints` in
-`db/preprocess/src/src.py`. Group by `(person_nbr, agency_name)`, sort by
-start date, and start a new stint when the next start is more than a day
-after the latest end seen so far. The merged row takes the earliest start,
-the latest end, and every other field from the most recent member.
+Group by `(person_nbr, agency_name)`, sort by start date, and start a new
+stint when the next start is more than a day after the **running maximum**
+end seen so far (`cummax`). Don't compare only with the previous row: a long
+appointment with shorter rows nested inside it would be split
+(`db/preprocess`'s `collapse_contiguous_stints` has this bug). The merged
+row takes the earliest start, the latest end, and every other field from
+the most recent member. Implementations: `collapse_stints` in the TX, FL
+and WA `clean.py`, and `collapse_contiguous_stints` in
+`clean/2026/IL/src/clean.py`.
 
-Two refinements worth copying from `clean/2026/IL/src/clean.py`:
+Two decisions to make per state, with counts in the README:
 
-- **An open end date mid-sequence is stale.** If a row has an empty
-  `end_date` but is followed by another row at the same agency, the state
-  never closed it; treat it as ending when the next row starts. Only a
-  genuinely final open row should keep the stint open.
+- **Is an open end date mid-sequence stale?** In KS and IL, an empty
+  `end_date` followed by another row at the same agency was never closed.
+  It is treated as ending when the next row starts. In **TX and FL the
+  opposite holds**: the later rows are concurrent appointments (Jailer +
+  Peace Officer) or zero-length artifacts, and the open row really is open.
+  Applying the rule there would wrongly end about 1,000 current stints.
+  Check by asking how many of the affected officers have a later job at
+  another agency (TX: 56 of 1,024; FL: 167 of 947). If few do, the open
+  rows are real.
 - **Fall back for empty fields.** Taking the most recent row wholesale can
-  pick up an empty `separation_reason`; fall back to the latest non-empty
-  value in the group.
+  pick up an empty `separation_reason`. Fall back to the latest non-empty
+  value, or (FL) take it from the member that ended last.
 
 **Collapsing flattens rank history** — a promotion recorded as two adjacent
 rows becomes one stint carrying the later rank. That is the intended
@@ -467,6 +673,30 @@ for col, count in empty_required.items():
 assert (df['start_date'] != '').all(), "start_date must not be empty"
 ```
 
+**Every drop goes to review, with counts.** Each filter writes the rows it
+removes to `data/output/review/<reason>.csv` and prints the count. Rows
+that are kept but merged or flagged (collapsed stints, duplicates) go to
+review too.
+
+**Report what an empty `start_date` costs.** `db/preprocess` drops every
+row with an empty `start_date`, so drop them in `clean.py` and record three
+numbers in the README:
+
+1. rows dropped;
+2. unique people with at least one row dropped;
+3. **people who leave the index entirely** (no other stint with a start
+   date), broken down by appointment type where there is one.
+
+```python
+dropped = pd.read_csv("data/output/review/no_start_date.csv", dtype=str)
+index = pd.read_csv("data/output/wa_index.csv", dtype=str)
+gone = set(dropped.person_nbr) - set(index.person_nbr)
+print(len(dropped), dropped.person_nbr.nunique(), len(gone))
+```
+
+WA example: 18,537 rows, 18,109 people, 16,159 people gone, of whom only 31
+were Certified Peace Officers.
+
 ### Step 14: Write output
 
 ```python
@@ -474,7 +704,7 @@ import argparse, os
 
 parser = argparse.ArgumentParser()
 parser.add_argument("--input-dir", default="data/input")
-parser.add_argument("--output-dir", default="output")
+parser.add_argument("--output-dir", default="data/output")
 args = parser.parse_args()
 
 output_dir = args.output_dir
@@ -487,6 +717,30 @@ discipline_df.to_csv(
     os.path.join(output_dir, '<state>-discipline_index.csv'), index=False
 )
 ```
+
+### Step 15: README and lint
+
+**`clean/<year>/<STATE>/README.md`** follows the KS/FL/WA layout:
+
+1. **Data Files**: the source and how it was obtained, then a table of
+   every file and sheet with row counts and whether it is used.
+2. **Replicating**: `download.py`, then `clean.py`. Say so if the
+   download link is missing or not public.
+3. **Data Cleaning and Processing**: every step in `clean.py`, in order,
+   with counts. This includes each agency-name rule, each review file, and
+   the empty-`start_date` numbers from Step 13.
+4. **Output**: row, officer and agency counts, plus the column list.
+5. **Deliberately not cleaned / columns dropped**, and why.
+6. **Issues / open questions** for the team.
+
+**Lint.** Run `make lint` (pre-commit on all files) and **run it again
+until every hook passes**. The first run fixes files in place and reports
+"Failed". Notebooks are linted too (`nbqa-ruff`, `nbqa-black`,
+`pretty-format-json`). Bare display lines such as `df` in the middle of a
+cell fail ruff's B018, so remove them. **CI can still fail after a local
+pass:** `nbqa-ruff` installs the latest ruff in CI, which can be newer than
+your local copy. If CI fails, read the diff in its log and apply it
+exactly.
 
 ---
 
