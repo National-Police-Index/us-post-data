@@ -742,6 +742,16 @@ pass:** `nbqa-ruff` installs the latest ruff in CI, which can be newer than
 your local copy. If CI fails, read the diff in its log and apply it
 exactly.
 
+Two more ways a local pass can mislead:
+
+- **`make lint` only covers tracked files** (`pre-commit --all-files`). A
+  new `clean/<year>/<STATE>/` folder is skipped until it has been
+  `git add`ed. Lint it explicitly first:
+  `pre-commit run --files $(git ls-files -o --exclude-standard clean/)`.
+- **Saving a notebook after linting un-formats it.** Jupyter and VS Code
+  re-indent `.ipynb` on save, which fails `pretty-format-json`. Lint again
+  after your last save, right before `git add`.
+
 ---
 
 ---
@@ -973,6 +983,9 @@ the full explanation and the orphan-document incident that motivated it.
 ---
 
 # Part 3 — The automated agent pipeline
+
+> **The automated pipeline is paused.** This part is kept for when it
+> resumes. How to run it is in the appendix of `AGENT_INSTRUCTIONS.md`.
 
 **This part applies only to the CC agent** (`pipeline/cc_agent.py`), which
 writes cleaning scripts unattended and needs a machine-readable way to judge
