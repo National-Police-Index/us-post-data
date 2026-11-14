@@ -1,9 +1,19 @@
 # State Processing — Agent Instructions
 
+> **This file is for the automated pipeline (`pipeline/`), which is currently
+> paused.** The pipeline's agent reads it (`pipeline/cc_agent.py`). Manual
+> cleaning happens in `clean/<year>/<STATE>/` instead; see `CLAUDE.md`. How to
+> run the pipeline itself is in the
+> [appendix](#appendix-running-the-automated-pipeline-paused) at the end.
+
 **Before doing anything else, read [`DATA_PREPROCESSING_GUIDE.md`](DATA_PREPROCESSING_GUIDE.md)
 in full.** It is the authoritative schema definition, step-by-step cleaning
 process, common pitfalls, and code patterns. This file only tells you *what*
 to process and *where* files live.
+
+The guide's checklist applies to you, with two differences. You work in
+`states/<state>/<year>/` (below), not `clean/<year>/<STATE>/`. And
+`download.py` is not needed, because rclone fills `data/input/` for you.
 
 ---
 
@@ -216,3 +226,97 @@ employment records), treat it as analogous to the GA/FL pattern:
    trailing slash fragment (`/.*$`) and filter rows where the cleaned name
    matches known non-agency values (`application denied`,
    `application purged`, `pending`, `unknown`).
+
+---
+
+## Appendix: running the automated pipeline (paused)
+
+> For operators, not the agent. This section was moved here from `CLAUDE.md`
+> when the pipeline was paused, so none of it is lost. Setup, secrets and
+> `registry.csv` are also described in `pipeline/README.md`.
+
+### What it does
+
+`pipeline/` polls Dropbox for new data and invokes a Claude SDK agent to
+write state-specific `clean.py` and `validate.py`. It then runs the
+LLM-as-judge validation and opens a GitHub PR. A GitHub Actions workflow
+(`.github/workflows/firebase-upload.yaml`) uploads to Firebase on merge.
+
+### Commands
+
+```bash
+# Run against test remote (ga and ca test states):
+set -a && source states/helpers/.env && set +a
+RCLONE_REMOTE=dropbox:post-db-test python3 -m pipeline.main --states ga ca
+
+# Run against production remote (all states):
+python3 -m pipeline.main
+
+# Run a single state:
+python3 -m pipeline.main --states ga
+
+# Re-run a state by hand (from states/<state>/<year>/):
+python src/clean.py --input-dir data/input --output-dir output
+python src/validate.py   # LLM-as-judge: writes output/judge_report.md + judge_report.json
+
+# Unit tests:
+pytest tests/pipeline/ -v
+```
+
+### Data flow
+
+```
+Dropbox (<remote>/<state>/<year>/input/)
+    → states/<state>/<year>/data/input/     (raw files, read-only)
+    → states/<state>/<year>/src/clean.py    (CC agent writes this)
+    → states/<state>/<year>/output/         (cleaned CSVs + judge reports)
+    → db/preprocess/                        (normalize + compress → .csv.gz)
+    → db/upload/ --dry-run                  (validate manifest without writing)
+    → db/upload/                            (push to Firebase Firestore)
+    → Front-end deployment
+```
+
+State codes are **lowercase everywhere** (dirs, rclone paths, registry).
+
+### `pipeline/` package
+
+- `main.py`: CLI entry point (`python -m pipeline.main --states ga ca`)
+- `orchestrate.py`: wires rclone → CC agent → PR together
+- `cc_agent.py`: Anthropic SDK tool-use loop (writes clean.py + validate.py)
+- `rclone_client.py`: Dropbox sync (list_years, lsjson, copy, copy_groundtruth)
+- `clean_runner.py`: runs an existing clean.py + validate.py
+- `pr_generator.py`: commits outputs, opens a GitHub PR
+- `registry.py`: tracks cleaned/firebase_pushed per (state, year)
+- `state_manifest.py`: rclone lsjson snapshots for change detection
+- `judge_parser.py`: reads judge_report.json (preferred), falls back to .md
+- `data/manifest.json`: change-detection snapshots (git-tracked)
+- `data/registry.csv`: clean/Firebase status per (state, year) (git-tracked)
+- `logs/`: runtime logs (gitignored)
+
+Related: `states/<state>/<year>/data/groundtruth/` (reference CSVs for the
+judge) and `states/helpers/llm_models.py` (Azure OpenAI wrapper used by
+`validate.py`).
+
+### CC agent
+
+`pipeline/cc_agent.py` uses the Anthropic Python SDK tool-use loop:
+
+- Model `claude-sonnet-4-6`, `MAX_TURNS=100`, `MAX_TOKENS=16384`
+- Tools: `read_file`, `write_file`, `append_to_file`, `edit_file`, `bash`
+- Reads this file, `DATA_PREPROCESSING_GUIDE.md` and
+  `readmes/<STATE>_README.md` (if present)
+- Streams every turn to `pipeline/logs/cc-agent-<state>-<year>-<ts>.log`
+- Do not call it with `claude --print`: that exits 0 with empty stdout when
+  run from inside a Claude Code session
+
+### Secrets
+
+| Secret | Purpose |
+|--------|---------|
+| `ANTHROPIC_API_KEY` | CC agent (Anthropic SDK) |
+| `RCLONE_CONFIG` | rclone.conf for Dropbox access |
+| `RCLONE_REMOTE` | Override remote (default: `dropbox:national-post-db`) |
+| `AZURE_ENDPOINT` / `AZURE_API_KEY` / `API_VERSION` | LLM judge (Azure OpenAI) |
+| `FIREBASE_SERVICE_ACCOUNT_JSON` | Firebase upload from CI |
+
+Locally these go in `states/helpers/.env`; in CI they are GitHub secrets.
